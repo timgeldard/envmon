@@ -1,0 +1,23 @@
+# Databricks Apps configuration — generated from app.template.yaml by `make render-app-config`
+# Do not edit app.yaml directly; edit this template instead.
+# auth_type and requested_scopes are configured via the App Settings UI (User authorization).
+command:
+  - uvicorn
+  - backend.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+env:
+  - name: DATABRICKS_WAREHOUSE_HTTP_PATH
+    value: "${DATABRICKS_WAREHOUSE_HTTP_PATH}"
+
+  - name: TRACE_CATALOG
+    value: "${TRACE_CATALOG}"
+
+  - name: TRACE_SCHEMA
+    value: "${TRACE_SCHEMA}"
+
+  - name: EM_PLANT_ID
+    value: "${EM_PLANT_ID}"
