@@ -1,6 +1,6 @@
 """
-GET /api/em/floors        — list all floors with location counts
-GET /api/em/locations     — all locations with optional floor filter and mapped/unmapped status
+GET /api/em/floors    — list floors with mapped location counts
+GET /api/em/locations — all functional locations for a floor (mapped + unmapped)
 """
 
 from typing import Optional
@@ -8,7 +8,14 @@ from typing import Optional
 from fastapi import APIRouter, Header
 
 from backend.schemas.em import FloorInfo, LocationMeta
-from backend.utils.db import resolve_token, run_sql_async, sql_param, tbl
+from backend.utils.db import resolve_token, run_sql_async, sql_param
+from backend.utils.em_config import (
+    COORD_TBL,
+    INSP_TYPES_SQL,
+    LOT_TBL,
+    PLANT_ID,
+    POINT_TBL,
+)
 
 router = APIRouter()
 
@@ -26,13 +33,12 @@ async def list_floors(
 ):
     token = resolve_token(x_forwarded_access_token, authorization)
 
-    # Count mapped locations per floor
     sql = f"""
         SELECT
-            c.floor_id,
-            COUNT(DISTINCT c.func_loc_id) AS location_count
-        FROM {tbl('em_location_coordinates')} c
-        GROUP BY c.floor_id
+            floor_id,
+            COUNT(DISTINCT func_loc_id) AS location_count
+        FROM {COORD_TBL}
+        GROUP BY floor_id
     """
     rows = await run_sql_async(token, sql)
     count_map = {r["floor_id"]: int(r["location_count"] or 0) for r in rows}
@@ -54,40 +60,53 @@ async def list_locations(
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
+    """
+    Returns all functional locations known from inspection point data,
+    annotated with their X/Y coordinates where mapped.
+
+    - Mapped locations come from em_location_coordinates joined to gold_inspection_point.
+    - Unmapped locations are functional locations that appear in inspection data
+      for P225 type-14 lots but have no coordinate entry yet.
+    """
     token = resolve_token(x_forwarded_access_token, authorization)
 
-    params = []
+    params = [sql_param("plant_id", PLANT_ID)]
     floor_filter = ""
     if floor_id:
         params.append(sql_param("floor_id", floor_id))
         floor_filter = "AND c.floor_id = :floor_id"
 
-    mapped_filter = "AND c.func_loc_id IS NOT NULL" if mapped_only else ""
+    mapped_filter = "WHERE c.func_loc_id IS NOT NULL" if mapped_only else ""
 
     sql = f"""
+        WITH known_locs AS (
+            SELECT DISTINCT ip.FUNCTIONAL_LOCATION AS func_loc_id
+            FROM {LOT_TBL} lot
+            JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
+            WHERE lot.PLANT_ID = :plant_id
+              AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+              AND ip.FUNCTIONAL_LOCATION IS NOT NULL
+        )
         SELECT
-            d.func_loc_id,
-            d.func_loc_name,
-            d.plant_id,
+            kl.func_loc_id,
             c.floor_id,
             c.x_pos,
             c.y_pos,
             CASE WHEN c.func_loc_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_mapped
-        FROM {tbl('em_site_material_dim_mv')} d
-        LEFT JOIN {tbl('em_location_coordinates')} c
-            ON d.func_loc_id = c.func_loc_id
-        WHERE 1=1
-          {floor_filter}
-          {mapped_filter}
-        ORDER BY d.func_loc_id
+        FROM known_locs kl
+        LEFT JOIN {COORD_TBL} c
+            ON kl.func_loc_id = c.func_loc_id
+           {floor_filter}
+        {mapped_filter}
+        ORDER BY kl.func_loc_id
     """
-    rows = await run_sql_async(token, sql, params or None)
+    rows = await run_sql_async(token, sql, params)
 
     return [
         LocationMeta(
             func_loc_id=r["func_loc_id"],
-            func_loc_name=r.get("func_loc_name"),
-            plant_id=r.get("plant_id", ""),
+            func_loc_name=None,  # functional location code is self-descriptive
+            plant_id=PLANT_ID,
             floor_id=r.get("floor_id"),
             x_pos=float(r["x_pos"]) if r.get("x_pos") is not None else None,
             y_pos=float(r["y_pos"]) if r.get("y_pos") is not None else None,

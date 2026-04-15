@@ -1,6 +1,10 @@
 """
-GET  /api/em/coordinates/unmapped — locations in dim that have no coordinate entry
-POST /api/em/coordinates          — upsert a coordinate mapping (admin only)
+GET  /api/em/coordinates/unmapped — functional locations with no X/Y entry
+POST /api/em/coordinates          — upsert a coordinate mapping (admin)
+
+Unmapped locations are derived by finding all DISTINCT FUNCTIONAL_LOCATION values
+from the inspection point data (type-14 lots, P225) that have no corresponding
+row in em_location_coordinates.
 """
 
 from typing import Optional
@@ -8,7 +12,14 @@ from typing import Optional
 from fastapi import APIRouter, Header
 
 from backend.schemas.em import CoordinateUpsertRequest, CoordinateUpsertResponse, LocationMeta
-from backend.utils.db import resolve_token, run_sql_async, sql_param, tbl
+from backend.utils.db import resolve_token, run_sql_async, sql_param
+from backend.utils.em_config import (
+    COORD_TBL,
+    INSP_TYPES_SQL,
+    LOT_TBL,
+    PLANT_ID,
+    POINT_TBL,
+)
 
 router = APIRouter()
 
@@ -18,27 +29,40 @@ async def list_unmapped(
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
-    """Return SAP locations that exist in the dimension view but have no X/Y mapping."""
+    """
+    Return functional locations that appear in type-14 inspection data for P225
+    but have no entry in em_location_coordinates.
+
+    These are candidates for the admin spatial authoring tool.
+    """
     token = resolve_token(x_forwarded_access_token, authorization)
 
+    params = [sql_param("plant_id", PLANT_ID)]
+
     sql = f"""
-        SELECT
-            d.func_loc_id,
-            d.func_loc_name,
-            d.plant_id
-        FROM {tbl('em_site_material_dim_mv')} d
-        LEFT JOIN {tbl('em_location_coordinates')} c
-            ON d.func_loc_id = c.func_loc_id
+        WITH active_locs AS (
+            SELECT DISTINCT ip.FUNCTIONAL_LOCATION AS func_loc_id
+            FROM {LOT_TBL} lot
+            JOIN {POINT_TBL} ip
+                ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
+            WHERE lot.PLANT_ID          = :plant_id
+              AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+              AND ip.FUNCTIONAL_LOCATION IS NOT NULL
+        )
+        SELECT al.func_loc_id
+        FROM active_locs al
+        LEFT JOIN {COORD_TBL} c
+            ON al.func_loc_id = c.func_loc_id
         WHERE c.func_loc_id IS NULL
-        ORDER BY d.func_loc_id
+        ORDER BY al.func_loc_id
     """
-    rows = await run_sql_async(token, sql)
+    rows = await run_sql_async(token, sql, params)
 
     return [
         LocationMeta(
             func_loc_id=r["func_loc_id"],
-            func_loc_name=r.get("func_loc_name"),
-            plant_id=r.get("plant_id", ""),
+            func_loc_name=None,
+            plant_id=PLANT_ID,
             floor_id=None,
             x_pos=None,
             y_pos=None,
@@ -54,7 +78,14 @@ async def upsert_coordinate(
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
-    """Insert or update the X/Y coordinates for a functional location."""
+    """
+    Insert or update the X/Y floor-plan coordinates for a functional location.
+
+    Coordinates are stored as relative % values (0–100) so they remain
+    responsive across different browser viewport sizes.
+
+    Uses a MERGE statement so repeated saves are idempotent.
+    """
     token = resolve_token(x_forwarded_access_token, authorization)
 
     params = [
@@ -64,23 +95,22 @@ async def upsert_coordinate(
         sql_param("y_pos", body.y_pos),
     ]
 
-    # MERGE upserts into the Silver coordinate table
     sql = f"""
-        MERGE INTO {tbl('em_location_coordinates')} AS target
+        MERGE INTO {COORD_TBL} AS target
         USING (
             SELECT
-                :func_loc_id AS func_loc_id,
-                :floor_id    AS floor_id,
-                CAST(:x_pos AS DOUBLE) AS x_pos,
-                CAST(:y_pos AS DOUBLE) AS y_pos
+                :func_loc_id            AS func_loc_id,
+                :floor_id               AS floor_id,
+                CAST(:x_pos AS DOUBLE)  AS x_pos,
+                CAST(:y_pos AS DOUBLE)  AS y_pos
         ) AS source
         ON target.func_loc_id = source.func_loc_id
         WHEN MATCHED THEN UPDATE SET
-            target.floor_id     = source.floor_id,
-            target.x_pos        = source.x_pos,
-            target.y_pos        = source.y_pos,
-            target.updated_by   = CURRENT_USER(),
-            target.updated_at   = CURRENT_TIMESTAMP()
+            target.floor_id   = source.floor_id,
+            target.x_pos      = source.x_pos,
+            target.y_pos      = source.y_pos,
+            target.updated_by = CURRENT_USER(),
+            target.updated_at = CURRENT_TIMESTAMP()
         WHEN NOT MATCHED THEN INSERT (
             func_loc_id, floor_id, x_pos, y_pos, updated_by, updated_at
         ) VALUES (

@@ -3,9 +3,9 @@
  * Built with a lightweight SVG polyline; no additional chart library needed.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Select, SelectItem, Loading } from '@carbon/react';
-import { useTrends, useLots } from '~/api/client';
+import { useTrends, useMics } from '~/api/client';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
 
@@ -34,18 +34,11 @@ export default function TrendTab({ funcLocId }: TrendTabProps) {
   const [selectedMic, setSelectedMic] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState<TimeWindow>(timeWindow);
 
-  // Derive available MIC names from lots data
-  const { data: lots } = useLots(funcLocId, timeWindow);
+  // Fetch available MIC names from the /mics endpoint (real SAP data)
+  const { data: micNames = [] } = useMics(funcLocId);
 
-  // Once we know which MIC is selected, fetch the trend
+  // Once a MIC is selected, fetch the trend
   const { data: trend, isLoading } = useTrends(funcLocId, selectedMic, windowDays);
-
-  // Derive unique MIC names from lots (placeholder until unified view is wired)
-  const micNames = useMemo<string[]>(() => {
-    if (!lots || lots.length === 0) return [];
-    // In real data, mic names come from the trend endpoint; use a placeholder list
-    return ['Aerobic count', 'Yeast & mould', 'Enterobacteriaceae'];
-  }, [lots]);
 
   if (isLoading) {
     return <Loading description="Loading trend…" withOverlay={false} small />;

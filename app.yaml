@@ -17,3 +17,10 @@ env:
 
   - name: TRACE_SCHEMA
     value: "gold"
+
+  # EM-specific configuration
+  - name: EM_PLANT_ID
+    value: "P225"
+
+  - name: EM_COORD_SCHEMA
+    value: "gold"

@@ -1,47 +1,61 @@
 """
 GET /api/em/heatmap — heatmap data for a floor in deterministic or continuous mode.
 
-Deterministic (worst-case):
-  FAIL   → at least one R valuation in window
-  PENDING → lot exists but Inspection_End_Date is NULL
-  PASS   → all A valuations
+Data source: three-table join
+  gold_inspection_lot → gold_inspection_point → gold_batch_quality_result_v
+filtered to PLANT_ID = P225 and INSPECTION_TYPE IN ('14', 'Z14').
+
+Deterministic (worst-case per location in window):
+  FAIL    → at least one lot has INSPECTION_RESULT_VALUATION = 'R'
+  PENDING → lot exists but INSPECTION_END_DATE IS NULL
+  PASS    → all lots have INSPECTION_RESULT_VALUATION = 'A'
   NO_DATA → no lots in window
 
 Continuous (weighted intensity):
   S = sum(F_i * exp(-lambda * t_i))
-  F_i: 1=fail, 0.2=warning
-  lambda: 0.1 (≈14-day half-life)
+  F_i: 1.0 for fail ('R'), 0.2 for warning ('W')
+  t_i: days since lot CREATED_DATE
+  lambda: 0.1 (≈ 14-day effective half-life at ln2/lambda ≈ 6.9 days)
 """
 
 import math
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Header, Query
 
 from backend.schemas.em import HeatmapResponse, MarkerData
-from backend.utils.db import resolve_token, run_sql_async, sql_param, tbl
+from backend.utils.db import resolve_token, run_sql_async, sql_param
+from backend.utils.em_config import (
+    COORD_TBL,
+    INSP_TYPES_SQL,
+    LOT_TBL,
+    PLANT_ID,
+    POINT_TBL,
+    RESULT_TBL,
+)
 
 router = APIRouter()
 
-_LAMBDA = 0.1  # decay constant
+_LAMBDA = 0.1
 
 
-def _compute_risk_score(rows: list[dict], today: date) -> float:
+def _risk_score(lot_rows: list[dict], today: date) -> float:
     score = 0.0
-    for r in rows:
-        valuation = (r.get("valuation") or "").upper()
-        end_date_str = r.get("inspection_end_date")
-        if not end_date_str:
+    for r in lot_rows:
+        val = (r.get("lot_valuation") or "").upper()
+        created_str = r.get("lot_date")
+        if not created_str:
             continue
         try:
-            end_date = date.fromisoformat(str(end_date_str)[:10])
+            created = date.fromisoformat(str(created_str)[:10])
         except ValueError:
             continue
-        t_i = (today - end_date).days
-        if valuation == "R":
+        t_i = (today - created).days
+        if val == "R":
             f_i = 1.0
-        elif valuation == "W":
+        elif val == "W":
             f_i = 0.2
         else:
             continue
@@ -62,51 +76,84 @@ async def get_heatmap(
     date_from = (date.today() - timedelta(days=time_window_days)).isoformat()
     params = [
         sql_param("floor_id", floor_id),
+        sql_param("plant_id", PLANT_ID),
         sql_param("date_from", date_from),
     ]
 
+    # One row per (functional_location, lot) — worst valuation per lot aggregated in SQL.
+    # Python then computes the deterministic status and continuous risk score per location.
     sql = f"""
         SELECT
             c.func_loc_id,
-            d.func_loc_name,
             c.floor_id,
             c.x_pos,
             c.y_pos,
-            q.inspection_end_date,
-            q.valuation
-        FROM {tbl('em_location_coordinates')} c
-        LEFT JOIN {tbl('em_site_material_dim_mv')} d
-            ON c.func_loc_id = d.func_loc_id
-        LEFT JOIN {tbl('em_quality_metrics_mv')} q
-            ON c.func_loc_id = q.func_loc_id
-           AND (q.inspection_start_date >= :date_from OR q.inspection_start_date IS NULL)
+            lot.INSPECTION_LOT_ID       AS lot_id,
+            lot.CREATED_DATE            AS lot_date,
+            lot.INSPECTION_END_DATE     AS lot_end_date,
+            MAX(
+                CASE r.INSPECTION_RESULT_VALUATION
+                    WHEN 'R' THEN 2
+                    WHEN 'W' THEN 1
+                    WHEN 'A' THEN 0
+                    ELSE -1
+                END
+            )                           AS worst_val_rank,
+            MAX(
+                CASE r.INSPECTION_RESULT_VALUATION
+                    WHEN 'R' THEN 'R'
+                    WHEN 'W' THEN 'W'
+                    WHEN 'A' THEN 'A'
+                    ELSE NULL
+                END
+            )                           AS lot_valuation
+        FROM {COORD_TBL} c
+        JOIN {POINT_TBL} ip
+            ON c.func_loc_id = ip.FUNCTIONAL_LOCATION
+        JOIN {LOT_TBL} lot
+            ON ip.INSPECTION_LOT_ID = lot.INSPECTION_LOT_ID
+           AND lot.PLANT_ID = :plant_id
+           AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+           AND lot.CREATED_DATE >= :date_from
+        LEFT JOIN {RESULT_TBL} r
+            ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+           AND ip.OPERATION_ID      = r.OPERATION_ID
+           AND ip.SAMPLE_ID         = r.SAMPLE_ID
         WHERE c.floor_id = :floor_id
-        ORDER BY c.func_loc_id
+        GROUP BY
+            c.func_loc_id, c.floor_id, c.x_pos, c.y_pos,
+            lot.INSPECTION_LOT_ID, lot.CREATED_DATE, lot.INSPECTION_END_DATE
     """
     rows = await run_sql_async(token, sql, params)
 
-    # Group rows by location
-    from collections import defaultdict
-    loc_rows: dict[str, list[dict]] = defaultdict(list)
-    loc_meta: dict[str, dict] = {}
+    # Also fetch coordinates for locations with NO lots (NO_DATA markers)
+    coord_sql = f"""
+        SELECT func_loc_id, floor_id, x_pos, y_pos
+        FROM {COORD_TBL}
+        WHERE floor_id = :floor_id
+    """
+    coord_rows = await run_sql_async(token, coord_sql, [sql_param("floor_id", floor_id)])
+
+    # Build a coordinate map
+    coord_map: dict[str, dict] = {r["func_loc_id"]: r for r in coord_rows}
+
+    # Group lot-level rows by func_loc_id
+    loc_lots: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
-        fid = r["func_loc_id"]
-        loc_meta[fid] = r
-        if r.get("valuation") is not None or r.get("inspection_end_date") is not None:
-            loc_rows[fid].append(r)
+        loc_lots[r["func_loc_id"]].append(r)
 
     today = date.today()
     markers: list[MarkerData] = []
 
-    for fid, meta in loc_meta.items():
-        lot_rows = loc_rows.get(fid, [])
-        fail_count = sum(1 for r in lot_rows if (r.get("valuation") or "").upper() == "R")
-        pass_count = sum(1 for r in lot_rows if (r.get("valuation") or "").upper() == "A")
-        pending_count = sum(1 for r in lot_rows if r.get("inspection_end_date") is None and r.get("valuation") is None)
-        total = len(lot_rows)
+    for func_loc_id, meta in coord_map.items():
+        lots = loc_lots.get(func_loc_id, [])
+        total_lots = len(lots)
+        fail_count = sum(1 for r in lots if r.get("lot_valuation") == "R")
+        pass_count = sum(1 for r in lots if r.get("lot_valuation") == "A")
+        pending_count = sum(1 for r in lots if r.get("lot_end_date") is None)
 
         if mode == "deterministic":
-            if total == 0:
+            if total_lots == 0:
                 status = "NO_DATA"
             elif fail_count > 0:
                 status = "FAIL"
@@ -116,13 +163,18 @@ async def get_heatmap(
                 status = "PASS"
             risk_score = None
         else:
-            risk_score = _compute_risk_score(lot_rows, today)
-            status = "FAIL" if fail_count > 0 else ("PASS" if total > 0 else "NO_DATA")
+            risk_score = _risk_score(lots, today)
+            if total_lots == 0:
+                status = "NO_DATA"
+            elif fail_count > 0:
+                status = "FAIL"
+            else:
+                status = "PASS"
 
         markers.append(
             MarkerData(
-                func_loc_id=fid,
-                func_loc_name=meta.get("func_loc_name"),
+                func_loc_id=func_loc_id,
+                func_loc_name=None,
                 floor_id=meta["floor_id"],
                 x_pos=float(meta["x_pos"]),
                 y_pos=float(meta["y_pos"]),
@@ -130,7 +182,7 @@ async def get_heatmap(
                 fail_count=fail_count,
                 pass_count=pass_count,
                 pending_count=pending_count,
-                total_count=total,
+                total_count=total_lots,
                 risk_score=risk_score,
             )
         )

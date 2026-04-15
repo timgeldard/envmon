@@ -80,6 +80,15 @@ export function useHeatmap(
 // Trends
 // ---------------------------------------------------------------------------
 
+export function useMics(funcLocId: string | null) {
+  return useQuery<string[]>({
+    queryKey: ['mics', funcLocId],
+    queryFn: () => apiFetch(`/api/em/mics?func_loc_id=${encodeURIComponent(funcLocId!)}`),
+    enabled: Boolean(funcLocId),
+    staleTime: 10 * 60_000,
+  });
+}
+
 export function useTrends(
   funcLocId: string | null,
   micName: string | null,
