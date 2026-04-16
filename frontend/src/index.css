@@ -6,6 +6,8 @@
   $theme: themes.$white
 );
 @use '@carbon/styles/scss/components/button';
+@use '@carbon/styles/scss/components/toggle';
+@use '@carbon/styles/scss/components/icon-button';
 @use '@carbon/styles/scss/components/tabs';
 @use '@carbon/styles/scss/components/side-nav';
 @use '@carbon/styles/scss/components/ui-shell';
@@ -16,12 +18,23 @@
 @use '@carbon/styles/scss/components/data-table';
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/select';
+@use '@carbon/styles/scss/components/search';
 @use '@carbon/styles/scss/components/content-switcher';
 @use '@carbon/styles/scss/components/structured-list';
 
 /* ---------------------------------------------------------------------------
    Application layout
    --------------------------------------------------------------------------- */
+
+/* Ensure skip link is visually hidden until keyboard-focused */
+.cds--skip-to-content:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 html,
 body,
@@ -122,6 +135,25 @@ body,
   border-bottom: 1px solid var(--cds-border-subtle-01);
 }
 
+/* Admin mode banner — sits flush under the 3rem header */
+.em-admin-banner {
+  position: fixed;
+  top: 3rem;
+  left: 0;
+  right: 0;
+  z-index: 7999;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--cds-spacing-05);
+  background: var(--cds-background-brand);
+  color: var(--cds-text-on-color);
+  font-size: var(--cds-label-01-font-size, 0.75rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 /* Admin mapper — absolutely fills the position:relative parent in AppShell */
 .em-mapper-container {
   position: absolute;
@@ -130,7 +162,8 @@ body,
 }
 
 .em-mapper-sidebar {
-  width: 280px;
+  width: min(360px, 35vw);
+  min-width: 260px;
   flex-shrink: 0;
   border-right: 1px solid var(--cds-border-subtle-01);
   overflow-y: auto;
@@ -145,8 +178,8 @@ body,
 
 /* Hierarchy filter dropdowns in the unmapped tab */
 .em-hierarchy-filters {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--cds-spacing-03);
   padding: var(--cds-spacing-03) var(--cds-spacing-05);
 }
@@ -155,6 +188,15 @@ body,
   font-size: var(--cds-label-01-font-size, 0.75rem);
   color: var(--cds-text-secondary);
   padding: 0 var(--cds-spacing-05) var(--cds-spacing-02);
+}
+
+/* Location search box in the unmapped tab */
+.em-mapper-search {
+  padding: var(--cds-spacing-03) var(--cds-spacing-05);
+}
+
+.em-mapper-search .cds--search {
+  width: 100%;
 }
 
 /* Draggable location items */

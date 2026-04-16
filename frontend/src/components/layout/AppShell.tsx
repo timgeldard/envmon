@@ -36,11 +36,13 @@ export default function AppShell() {
       <SkipToContent href="#main-content" />
 
       <Header aria-label="Environmental Monitoring">
-        <HeaderMenuButton
-          aria-label={isSideNavExpanded ? 'Close navigation' : 'Open navigation'}
-          isActive={isSideNavExpanded}
-          onClick={() => setIsSideNavExpanded((v) => !v)}
-        />
+        {!adminMode && (
+          <HeaderMenuButton
+            aria-label={isSideNavExpanded ? 'Close navigation' : 'Open navigation'}
+            isActive={isSideNavExpanded}
+            onClick={() => setIsSideNavExpanded((v) => !v)}
+          />
+        )}
         <HeaderName prefix="Kerry">Environmental Monitoring</HeaderName>
         <HeaderGlobalBar>
           <HeaderGlobalAction
@@ -54,41 +56,49 @@ export default function AppShell() {
         </HeaderGlobalBar>
       </Header>
 
-      <SideNav
-        aria-label="Floor navigation"
-        expanded={isSideNavExpanded}
-        isFixedNav
-      >
-        <SideNavItems>
-          {floorList.map((floor) => (
-            <SideNavLink
-              key={floor.floor_id}
-              renderIcon={Map}
-              isActive={activeFloor === floor.floor_id}
-              onClick={() => setActiveFloor(floor.floor_id)}
-            >
-              {floor.floor_name}
-              {floor.location_count > 0 && (
-                <span style={{
-                  marginLeft: 'var(--cds-spacing-03)',
-                  fontSize: 'var(--cds-label-01-font-size, 0.75rem)',
-                  opacity: 0.7,
-                }}>
-                  ({floor.location_count})
-                </span>
-              )}
-            </SideNavLink>
-          ))}
-        </SideNavItems>
-      </SideNav>
+      {adminMode && (
+        <div className="em-admin-banner" aria-hidden="true">
+          Admin mode — Coordinate Mapping
+        </div>
+      )}
 
-      {/* Main content — manually offset to clear fixed header (3rem) and side nav (16rem) */}
+      {!adminMode && (
+        <SideNav
+          aria-label="Floor navigation"
+          expanded={isSideNavExpanded}
+          isFixedNav
+        >
+          <SideNavItems>
+            {floorList.map((floor) => (
+              <SideNavLink
+                key={floor.floor_id}
+                renderIcon={Map}
+                isActive={activeFloor === floor.floor_id}
+                onClick={() => setActiveFloor(floor.floor_id)}
+              >
+                {floor.floor_name}
+                {floor.location_count > 0 && (
+                  <span style={{
+                    marginLeft: 'var(--cds-spacing-03)',
+                    fontSize: 'var(--cds-label-01-font-size, 0.75rem)',
+                    opacity: 0.7,
+                  }}>
+                    ({floor.location_count})
+                  </span>
+                )}
+              </SideNavLink>
+            ))}
+          </SideNavItems>
+        </SideNav>
+      )}
+
+      {/* Main content — offset to clear fixed header + optional side nav */}
       <div
         id="main-content"
         style={{
-          marginTop: '3rem',
-          marginLeft: isSideNavExpanded ? '16rem' : '0',
-          height: 'calc(100vh - 3rem)',
+          marginTop: adminMode ? '5rem' : '3rem',
+          marginLeft: adminMode ? '0' : (isSideNavExpanded ? '16rem' : '0'),
+          height: adminMode ? 'calc(100vh - 5rem)' : 'calc(100vh - 3rem)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
