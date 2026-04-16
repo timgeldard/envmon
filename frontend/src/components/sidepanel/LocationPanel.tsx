@@ -2,7 +2,6 @@
  * LocationPanel — right-hand side panel shown when a marker is selected.
  */
 
-import React from 'react';
 import { Tabs, Tab, TabList, TabPanels, TabPanel, IconButton } from '@carbon/react';
 import { Close } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
@@ -29,11 +28,12 @@ export default function LocationPanel() {
           </div>
           <IconButton
             label="Close panel"
-            renderIcon={Close}
             kind="ghost"
             size="sm"
             onClick={() => setSelectedLocId(null)}
-          />
+          >
+            <Close size={16} />
+          </IconButton>
         </div>
       </div>
 
