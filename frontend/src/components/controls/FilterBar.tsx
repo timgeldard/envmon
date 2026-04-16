@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select, SelectItem, ContentSwitcher, Switch } from '@carbon/react';
+import { Select, SelectItem, Toggle } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
 
@@ -28,16 +28,17 @@ export default function FilterBar() {
         ))}
       </Select>
 
-      <ContentSwitcher
-        size="sm"
-        selectedIndex={heatmapMode === 'deterministic' ? 0 : 1}
-        onChange={({ index }: { index: number }) =>
-          setHeatmapMode(index === 0 ? 'deterministic' : 'continuous')
+      <Toggle
+        id="em-heatmap-mode"
+        labelText="Heatmap mode"
+        labelA="Worst-case"
+        labelB="Risk density"
+        toggled={heatmapMode === 'continuous'}
+        onToggle={(checked: boolean) =>
+          setHeatmapMode(checked ? 'continuous' : 'deterministic')
         }
-      >
-        <Switch name="deterministic" text="Worst-case" />
-        <Switch name="continuous"    text="Risk density" />
-      </ContentSwitcher>
+        size="sm"
+      />
     </div>
   );
 }
