@@ -9,7 +9,6 @@ import {
   SideNavItems,
   SideNavLink,
   SkipToContent,
-  Layer,
 } from '@carbon/react';
 import { Settings, Map } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
@@ -59,7 +58,6 @@ export default function AppShell() {
         aria-label="Floor navigation"
         expanded={isSideNavExpanded}
         isFixedNav
-        isChildOfHeader={false}
       >
         <SideNavItems>
           {floorList.map((floor) => (
@@ -107,9 +105,7 @@ export default function AppShell() {
           )}
 
           {selectedLocId && !adminMode && (
-            <Layer level={1}>
-              <LocationPanel />
-            </Layer>
+            <LocationPanel />
           )}
         </div>
       </div>

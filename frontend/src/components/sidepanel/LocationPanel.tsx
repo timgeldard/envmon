@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { Tabs, Tab, TabList, TabPanels, TabPanel, IconButton, Layer } from '@carbon/react';
+import { Tabs, Tab, TabList, TabPanels, TabPanel, IconButton } from '@carbon/react';
 import { Close } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
 import TrendTab from './TrendTab';
@@ -38,22 +38,20 @@ export default function LocationPanel() {
       </div>
 
       <div className="em-side-panel__body">
-        <Layer>
-          <Tabs>
-            <TabList aria-label="Location detail tabs">
-              <Tab>Trend</Tab>
-              <Tab>Lots</Tab>
-            </TabList>
-            <TabPanels>
-              <TabPanel>
-                <TrendTab funcLocId={selectedLocId} />
-              </TabPanel>
-              <TabPanel>
-                <LotsTab funcLocId={selectedLocId} />
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </Layer>
+        <Tabs>
+          <TabList aria-label="Location detail tabs">
+            <Tab>Trend</Tab>
+            <Tab>Lots</Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel>
+              <TrendTab funcLocId={selectedLocId} />
+            </TabPanel>
+            <TabPanel>
+              <LotsTab funcLocId={selectedLocId} />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       </div>
     </div>
   );
