@@ -20,12 +20,15 @@ import type { MarkerData } from '~/types';
 const SVG_WIDTH = 1021.6;
 const SVG_HEIGHT = 722.48;
 
-// Dynamically import SVG floor plans as URLs (not inline) to keep the bundle light.
-// vite-plugin-svgr is configured but we use ?url imports for the background layer.
+// Import SVG floor plans as asset URLs via Vite's ?url suffix.
+import floor1Url from '~/assets/floor1.svg?url';
+import floor2Url from '~/assets/floor2.svg?url';
+import floor3Url from '~/assets/floor3.svg?url';
+
 const FLOOR_SVG: Record<string, string> = {
-  F1: new URL('~/assets/floor1.svg', import.meta.url).href,
-  F2: new URL('~/assets/floor2.svg', import.meta.url).href,
-  F3: new URL('~/assets/floor3.svg', import.meta.url).href,
+  F1: floor1Url,
+  F2: floor2Url,
+  F3: floor3Url,
 };
 
 export default function FloorPlan() {

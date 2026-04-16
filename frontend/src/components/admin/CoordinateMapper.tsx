@@ -12,11 +12,14 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Tag, InlineNotification, Loading } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import { useUnmappedLocations, useSaveCoordinate } from '~/api/client';
+import floor1Url from '~/assets/floor1.svg?url';
+import floor2Url from '~/assets/floor2.svg?url';
+import floor3Url from '~/assets/floor3.svg?url';
 
 const FLOOR_SVG: Record<string, string> = {
-  F1: new URL('~/assets/floor1.svg', import.meta.url).href,
-  F2: new URL('~/assets/floor2.svg', import.meta.url).href,
-  F3: new URL('~/assets/floor3.svg', import.meta.url).href,
+  F1: floor1Url,
+  F2: floor2Url,
+  F3: floor3Url,
 };
 
 export default function CoordinateMapper() {
@@ -111,7 +114,14 @@ export default function CoordinateMapper() {
         <img
           src={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
           alt={`Floor ${activeFloor} plan`}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
+          }}
         />
 
         {isPending && (
