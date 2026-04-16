@@ -8,7 +8,6 @@ import {
   SideNav,
   SideNavItems,
   SideNavLink,
-  Content,
   SkipToContent,
   Layer,
 } from '@carbon/react';
@@ -85,14 +84,17 @@ export default function AppShell() {
         </SideNavItems>
       </SideNav>
 
-      <Content
+      {/* Main content — manually offset to clear fixed header (3rem) and side nav (16rem) */}
+      <div
         id="main-content"
         style={{
-          padding: 0,
-          height: 'calc(100vh - var(--cds-spacing-09))',
+          marginTop: '3rem',
+          marginLeft: isSideNavExpanded ? '16rem' : '0',
+          height: 'calc(100vh - 3rem)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          transition: `margin-left 110ms var(--cds-motion-easing-standard, ease)`,
         }}
       >
         {!adminMode && <FilterBar />}
@@ -110,7 +112,7 @@ export default function AppShell() {
             </Layer>
           )}
         </div>
-      </Content>
+      </div>
     </div>
   );
 }
