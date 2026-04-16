@@ -68,13 +68,13 @@ async def get_heatmap(
     floor_id: str,
     mode: Literal["deterministic", "continuous"] = Query("deterministic"),
     time_window_days: int = Query(90, ge=1, le=365),
-    as_of_date: Optional[str] = Query(None, description="ISO date to view heatmap as of"),
+    as_of_date: Optional[date] = Query(None, description="ISO date to view heatmap as of"),
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
     token = resolve_token(x_forwarded_access_token, authorization)
 
-    reference_date = date.fromisoformat(as_of_date) if as_of_date else date.today()
+    reference_date = as_of_date or date.today()
     date_from = (reference_date - timedelta(days=time_window_days)).isoformat()
     date_to = reference_date.isoformat()
 
@@ -148,7 +148,6 @@ async def get_heatmap(
     for r in rows:
         loc_lots[r["func_loc_id"]].append(r)
 
-    today = date.today()
     markers: list[MarkerData] = []
 
     for func_loc_id, meta in coord_map.items():

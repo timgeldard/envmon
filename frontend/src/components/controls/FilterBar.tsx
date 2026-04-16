@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Select, SelectItem, Toggle, Layer, Slider } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
@@ -17,14 +18,41 @@ export default function FilterBar() {
     historicalDate, setHistoricalDate,
   } = useEM();
 
+  // Clamp or clear historicalDate when timeWindow shrinks
+  useEffect(() => {
+    if (historicalDate) {
+      const parts = historicalDate.split('-').map(Number);
+      const hDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today.getTime() - hDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > timeWindow) {
+        setHistoricalDate(null);
+      }
+    }
+  }, [timeWindow, historicalDate, setHistoricalDate]);
+
   const handleSliderChange = ({ value }: { value: number }) => {
     if (value === 0) {
       setHistoricalDate(null);
     } else {
       const d = new Date();
       d.setDate(d.getDate() - value);
-      setHistoricalDate(d.toISOString().split('T')[0]);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      setHistoricalDate(`${year}-${month}-${day}`);
     }
+  };
+
+  const getSliderValue = () => {
+    if (!historicalDate) return 0;
+    const parts = historicalDate.split('-').map(Number);
+    const hDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.floor((today.getTime() - hDate.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   return (
@@ -62,7 +90,7 @@ export default function FilterBar() {
             max={timeWindow}
             min={0}
             step={1}
-            value={historicalDate ? Math.floor((new Date().getTime() - new Date(historicalDate).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+            value={getSliderValue()}
             onChange={handleSliderChange}
             hideTextInput
           />

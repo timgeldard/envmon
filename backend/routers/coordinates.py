@@ -21,6 +21,7 @@ from backend.utils.em_config import (
     LOT_TBL,
     PLANT_ID,
     POINT_TBL,
+    RESULT_TBL,
 )
 
 router = APIRouter()
@@ -145,16 +146,17 @@ async def get_hierarchy(
     for r in rows:
         flid = r["func_loc_id"]
         parts = flid.split("-")
-        if len(parts) < 4: continue
+        if len(parts) < 4:
+            # Skip functional locations that don't follow the 5-level format (L1-L2-L3-L4-L5)
+            continue
 
         l1, l2, l3, l4 = parts[0], parts[1], parts[2], parts[3]
 
-        if l1 not in hierarchy: hierarchy[l1] = {}
-        if l2 not in hierarchy[l1]: hierarchy[l1][l2] = {}
-        if l3 not in hierarchy[l1][l2]: hierarchy[l1][l2][l3] = {}
-        if l4 not in hierarchy[l1][l2][l3]: hierarchy[l1][l2][l3][l4] = []
-
-        hierarchy[l1][l2][l3][l4].append(flid)
+        l1_dict = hierarchy.setdefault(l1, {})
+        l2_dict = l1_dict.setdefault(l2, {})
+        l3_dict = l2_dict.setdefault(l3, {})
+        l4_list = l3_dict.setdefault(l4, [])
+        l4_list.append(flid)
 
     return hierarchy
 
@@ -173,7 +175,11 @@ async def get_location_summary(
 
     # 1. Fetch metadata
     meta_params = [sql_param("func_loc_id", func_loc_id)]
-    meta_sql = f"SELECT * FROM {COORD_TBL} WHERE func_loc_id = :func_loc_id"
+    meta_sql = f"""
+        SELECT func_loc_id, floor_id, x_pos, y_pos
+        FROM {COORD_TBL}
+        WHERE func_loc_id = :func_loc_id
+    """
     meta_rows = await run_sql_async(token, meta_sql, meta_params)
     meta = None
     if meta_rows:
@@ -193,14 +199,23 @@ async def get_location_summary(
             is_mapped=False,
         )
 
-    # 2. Fetch MICs
-    mic_params = [sql_param("func_loc_id", func_loc_id), sql_param("plant_id", PLANT_ID)]
+    # 2. Fetch MICs (last 180 days to avoid unbounded scans)
+    from datetime import date, timedelta
+    date_from = (date.today() - timedelta(days=180)).isoformat()
+    mic_params = [
+        sql_param("func_loc_id", func_loc_id),
+        sql_param("plant_id", PLANT_ID),
+        sql_param("date_from", date_from),
+    ]
     mic_sql = f"""
         SELECT DISTINCT UPPER(TRIM(r.MIC_NAME)) AS mic_name
         FROM {LOT_TBL} lot
         JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
         JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
-        WHERE lot.PLANT_ID = :plant_id AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+        WHERE lot.PLANT_ID = :plant_id
+          AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+          AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+          AND lot.CREATED_DATE >= :date_from
     """
     mic_rows = await run_sql_async(token, mic_sql, mic_params)
     mics = [r["mic_name"] for r in mic_rows if r.get("mic_name")]
@@ -217,7 +232,9 @@ async def get_location_summary(
         FROM {LOT_TBL} lot
         JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
         LEFT JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
-        WHERE lot.PLANT_ID = :plant_id AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+        WHERE lot.PLANT_ID = :plant_id
+          AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+          AND ip.FUNCTIONAL_LOCATION = :func_loc_id
         GROUP BY 1, 2, 3, 4 ORDER BY 3 DESC LIMIT 5
     """
     lot_rows = await run_sql_async(token, lot_sql, mic_params)

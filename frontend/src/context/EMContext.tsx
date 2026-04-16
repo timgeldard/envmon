@@ -58,7 +58,7 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
   const [adminMode, setAdminMode] = useState(false);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
   const [theme, setThemeRaw] = useState<'white' | 'g100'>(
-    () => (readSearchParam<string>('theme', 'white', ['white', 'g100']) as 'white' | 'g100') ?? 'white',
+    () => readSearchParam<string>('theme', 'white', ['white', 'g100']) as 'white' | 'g100',
   );
   const [historicalDate, setHistoricalDateRaw] = useState<string | null>(null);
 

@@ -41,14 +41,11 @@ export default defineConfig({
             if (id.includes('@carbon/react') || id.includes('@carbon/styles') || id.includes('@carbon/layout')) {
               return 'vendor-carbon';
             }
-            if (id.includes('react-dom')) {
-              return 'vendor-react-dom';
-            }
-            if (id.includes('react')) {
-              return 'vendor-react-core';
-            }
             if (id.includes('@tanstack/react-query')) {
               return 'vendor-query';
+            }
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
+              return 'vendor-react';
             }
             return 'vendor';
           }
