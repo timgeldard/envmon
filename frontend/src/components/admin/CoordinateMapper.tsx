@@ -2,10 +2,12 @@
  * CoordinateMapper — admin spatial authoring tool.
  *
  * Left sidebar: list of unmapped SAP functional location IDs.
- * Right canvas: the active floor plan SVG.
+ * Right canvas: the active floor plan SVG (same viewBox as FloorPlan).
  *
- * Drag an ID from the sidebar and drop it on the floor plan.
- * The app captures relative % coordinates and POSTs to /api/em/coordinates.
+ * Drag an ID from the sidebar and drop it onto the SVG floor plan.
+ * Drop coordinates are converted from screen space → SVG viewBox space via
+ * getScreenCTM(), then stored as % of the viewBox so they match exactly how
+ * FloorPlan renders markers (x_svg = x_pos/100 * SVG_WIDTH).
  */
 
 import React, { useCallback, useRef, useState } from 'react';
@@ -22,9 +24,13 @@ const FLOOR_SVG: Record<string, string> = {
   F3: floor3Url,
 };
 
+// Must match FloorPlan.tsx
+const SVG_WIDTH = 1021.6;
+const SVG_HEIGHT = 722.48;
+
 export default function CoordinateMapper() {
   const { activeFloor } = useEM();
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -37,34 +43,44 @@ export default function CoordinateMapper() {
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<SVGSVGElement>) => {
       e.preventDefault();
-      if (!draggingId || !canvasRef.current) return;
+      if (!draggingId || !svgRef.current) return;
 
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x_pos = ((e.clientX - rect.left) / rect.width) * 100;
-      const y_pos = ((e.clientY - rect.top) / rect.height) * 100;
+      // Convert screen coordinates → SVG viewBox coordinates
+      const svgEl = svgRef.current;
+      const pt = svgEl.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const ctm = svgEl.getScreenCTM();
+      if (!ctm) return;
+      const svgPt = pt.matrixTransform(ctm.inverse());
 
-      saveCoordinate(
-        {
-          func_loc_id: draggingId,
-          floor_id: activeFloor,
-          x_pos: Math.round(x_pos * 100) / 100,
-          y_pos: Math.round(y_pos * 100) / 100,
+      // Convert to % of viewBox (clamped) — matches FloorPlan marker rendering
+      const x_pos = Math.max(0, Math.min(100, (svgPt.x / SVG_WIDTH) * 100));
+      const y_pos = Math.max(0, Math.min(100, (svgPt.y / SVG_HEIGHT) * 100));
+
+      const payload = {
+        func_loc_id: draggingId,
+        floor_id: activeFloor,
+        x_pos: Math.round(x_pos * 100) / 100,
+        y_pos: Math.round(y_pos * 100) / 100,
+      };
+
+      saveCoordinate(payload, {
+        onSuccess: () => {
+          setSuccessMsg(
+            `Saved ${draggingId} at (${x_pos.toFixed(1)}%, ${y_pos.toFixed(1)}%)`
+          );
+          setDraggingId(null);
+          setTimeout(() => setSuccessMsg(null), 3000);
         },
-        {
-          onSuccess: () => {
-            setSuccessMsg(`Saved ${draggingId} at (${x_pos.toFixed(1)}%, ${y_pos.toFixed(1)}%)`);
-            setDraggingId(null);
-            setTimeout(() => setSuccessMsg(null), 3000);
-          },
-        },
-      );
+      });
     },
     [draggingId, activeFloor, saveCoordinate],
   );
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent<SVGSVGElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
@@ -103,27 +119,44 @@ export default function CoordinateMapper() {
         ))}
       </div>
 
-      {/* Drop canvas */}
-      <div
-        className="em-mapper-canvas"
-        ref={canvasRef}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        style={{ position: 'relative' }}
-      >
-        <img
-          src={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
-          alt={`Floor ${activeFloor} plan`}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            display: 'block',
-          }}
-        />
+      {/* Drop canvas — SVG matching FloorPlan viewBox so coordinates are identical */}
+      <div className="em-mapper-canvas">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+          preserveAspectRatio="xMidYMid meet"
+          width="100%"
+          height="100%"
+          style={{ display: 'block', cursor: draggingId ? 'crosshair' : 'default' }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          {/* Floor plan image */}
+          <image
+            href={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
+            x={0}
+            y={0}
+            width={SVG_WIDTH}
+            height={SVG_HEIGHT}
+          />
 
+          {/* Drop hint overlay when dragging */}
+          {draggingId && (
+            <rect
+              x={0}
+              y={0}
+              width={SVG_WIDTH}
+              height={SVG_HEIGHT}
+              fill="none"
+              stroke="#0f62fe"
+              strokeWidth={8}
+              strokeDasharray="24 12"
+              pointerEvents="none"
+            />
+          )}
+        </svg>
+
+        {/* Overlays rendered outside SVG to avoid coordinate constraints */}
         {isPending && (
           <div style={{
             position: 'absolute', inset: 0,
@@ -145,15 +178,13 @@ export default function CoordinateMapper() {
           </div>
         )}
 
-        {/* Drop hint overlay when dragging */}
         {draggingId && (
           <div style={{
-            position: 'absolute', inset: 0,
-            border: '2px dashed #0f62fe',
+            position: 'absolute', bottom: '1rem', left: '50%',
+            transform: 'translateX(-50%)',
             pointerEvents: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Tag type="blue">Drop {draggingId} here</Tag>
+            <Tag type="blue">Drop {draggingId} on the floor plan</Tag>
           </div>
         )}
       </div>

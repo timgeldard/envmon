@@ -1,4 +1,4 @@
-// Carbon design tokens — must be first
+/* Carbon design tokens — must be first */
 @use '@carbon/styles/scss/reset';
 @use '@carbon/styles/scss/type';
 @use '@carbon/styles/scss/themes';
@@ -17,9 +17,9 @@
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/select';
 
-// ---------------------------------------------------------------------------
-// Application layout
-// ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
+   Application layout
+   --------------------------------------------------------------------------- */
 
 html,
 body,
@@ -34,11 +34,10 @@ body,
   height: 100%;
 }
 
-// Floor plan container — fills remaining space below the header
+/* Floor plan container — absolutely fills the position:relative parent in AppShell */
 .em-floorplan-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: #f4f4f4;
 }
@@ -49,7 +48,7 @@ body,
   display: block;
 }
 
-// Marker overlay — absolute-positioned SVG layer on top of floor plan
+/* Marker overlay — absolute-positioned SVG layer on top of floor plan */
 .em-markers-overlay {
   position: absolute;
   inset: 0;
@@ -61,21 +60,21 @@ body,
   }
 }
 
-// Status colours (Carbon-compatible palette)
-.em-marker--pass     { fill: #24a148; }   // Green 60
-.em-marker--fail     { fill: #da1e28; }   // Red 60
-.em-marker--pending  { fill: #f1c21b; }   // Yellow 30
-.em-marker--no-data  { fill: #8d8d8d; }   // Gray 50
+/* Status colours (Carbon-compatible palette) */
+.em-marker--pass     { fill: #24a148; }   /* Green 60 */
+.em-marker--fail     { fill: #da1e28; }   /* Red 60 */
+.em-marker--pending  { fill: #f1c21b; }   /* Yellow 30 */
+.em-marker--no-data  { fill: #8d8d8d; }   /* Gray 50 */
 
-// Glow effect for continuous mode
+/* Glow effect for continuous mode */
 .em-marker--glow {
   filter: drop-shadow(0 0 6px currentColor);
 }
 
-// Side panel
+/* Side panel */
 .em-side-panel {
   position: fixed;
-  top: 3rem; // below Carbon header
+  top: 3rem; /* below Carbon header */
   right: 0;
   width: 400px;
   height: calc(100% - 3rem);
@@ -97,7 +96,7 @@ body,
   overflow-y: auto;
 }
 
-// Tooltip
+/* Tooltip */
 .em-tooltip {
   position: fixed;
   background: #161616;
@@ -110,7 +109,7 @@ body,
   white-space: nowrap;
 }
 
-// Filter bar
+/* Filter bar */
 .em-filter-bar {
   display: flex;
   align-items: center;
@@ -120,10 +119,11 @@ body,
   border-bottom: 1px solid #e0e0e0;
 }
 
-// Admin mapper
+/* Admin mapper — absolutely fills the position:relative parent in AppShell */
 .em-mapper-container {
+  position: absolute;
+  inset: 0;
   display: flex;
-  height: 100%;
 }
 
 .em-mapper-sidebar {
@@ -137,7 +137,6 @@ body,
 .em-mapper-canvas {
   flex: 1;
   position: relative;
-  height: 100%;
   overflow: hidden;
   background: #f4f4f4;
 }
