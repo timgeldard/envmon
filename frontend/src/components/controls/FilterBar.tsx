@@ -1,4 +1,3 @@
-import React from 'react';
 import { Select, SelectItem, Toggle } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';

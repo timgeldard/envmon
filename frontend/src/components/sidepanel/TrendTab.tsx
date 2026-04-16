@@ -2,7 +2,7 @@
  * TrendTab — MIC result trend chart using Carbon design tokens throughout.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Select, SelectItem, Loading } from '@carbon/react';
 import { useTrends, useMics } from '~/api/client';
 import { useEM } from '~/context/EMContext';

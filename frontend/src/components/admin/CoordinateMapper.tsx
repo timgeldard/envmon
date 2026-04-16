@@ -138,6 +138,14 @@ export default function CoordinateMapper() {
     });
   }, [unmapped, l1, l2, l3, l4, searchQuery]);
 
+  const filteredMapped = useMemo(() => {
+    const lowerQuery = searchQuery.toLowerCase();
+    return mapped.filter((m) => {
+      if (lowerQuery && !m.func_loc_id.toLowerCase().includes(lowerQuery)) return false;
+      return true;
+    });
+  }, [mapped, searchQuery]);
+
   // Reset child filters when parent changes
   const handleL1 = (v: string) => { setL1(v); setL2(''); setL3(''); setL4(''); };
   const handleL2 = (v: string) => { setL2(v); setL3(''); setL4(''); };
@@ -210,8 +218,8 @@ export default function CoordinateMapper() {
       <div className="em-mapper-sidebar">
         <Tabs>
           <TabList aria-label="Coordinate mapping tabs">
-            <Tab>Unmapped ({unmapped.length})</Tab>
-            <Tab>Mapped ({mapped.length})</Tab>
+            <Tab>Unmapped ({filteredUnmapped.length})</Tab>
+            <Tab>Mapped ({filteredMapped.length})</Tab>
           </TabList>
 
           <TabPanels>
@@ -314,13 +322,15 @@ export default function CoordinateMapper() {
             <TabPanel>
               {loadingMapped && <Loading description="Loading…" withOverlay={false} small />}
 
-              {!loadingMapped && mapped.length === 0 && (
+              {!loadingMapped && filteredMapped.length === 0 && (
                 <p style={{ color: '#6f6f6f', fontSize: '0.8rem', marginTop: '0.75rem' }}>
-                  No locations mapped yet.
+                  {mapped.length === 0
+                    ? 'No locations mapped yet.'
+                    : 'No mapped locations match the search.'}
                 </p>
               )}
 
-              {mapped.map((loc) => (
+              {filteredMapped.map((loc) => (
                 <div key={loc.func_loc_id} className="em-mapped-row">
                   <div
                     className="em-draggable-id em-mapped-draggable"
@@ -423,7 +433,7 @@ export default function CoordinateMapper() {
               <g
                 key={loc.func_loc_id}
                 style={{ cursor: 'grab', opacity: isBeingDragged ? 0.3 : 1 }}
-                draggable
+                {...({ draggable: true } as any)}
                 onDragStart={() => setDragging({ funcLocId: loc.func_loc_id })}
                 onDragEnd={() => setDragging(null)}
               >

@@ -32,7 +32,13 @@ export default function AppShell() {
       }));
 
   return (
-    <div className="em-app">
+    <div
+      className="em-app"
+      style={{
+        '--shell-header-height': '3rem',
+        '--admin-banner-height': '2rem',
+      } as React.CSSProperties}
+    >
       <SkipToContent href="#main-content" />
 
       <Header aria-label="Environmental Monitoring">
@@ -93,12 +99,17 @@ export default function AppShell() {
       )}
 
       {/* Main content — offset to clear fixed header + optional side nav */}
-      <div
+      <main
         id="main-content"
+        tabIndex={-1}
         style={{
-          marginTop: adminMode ? '5rem' : '3rem',
+          marginTop: adminMode
+            ? 'calc(var(--shell-header-height) + var(--admin-banner-height))'
+            : 'var(--shell-header-height)',
           marginLeft: adminMode ? '0' : (isSideNavExpanded ? '16rem' : '0'),
-          height: adminMode ? 'calc(100vh - 5rem)' : 'calc(100vh - 3rem)',
+          height: adminMode
+            ? 'calc(100vh - (var(--shell-header-height) + var(--admin-banner-height)))'
+            : 'calc(100vh - var(--shell-header-height))',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -118,7 +129,7 @@ export default function AppShell() {
             <LocationPanel />
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

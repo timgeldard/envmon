@@ -3,7 +3,7 @@
  * Uses Carbon Table directly. MIC detail uses StructuredList.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Table,
   TableHead,
@@ -27,17 +27,17 @@ interface LotsTabProps {
   funcLocId: string;
 }
 
-const STATUS_KIND: Record<string, 'red' | 'green' | 'yellow' | 'gray'> = {
+const STATUS_KIND: Record<string, 'red' | 'green' | 'warm-gray' | 'gray'> = {
   FAIL:    'red',
   PASS:    'green',
-  PENDING: 'yellow',
+  PENDING: 'warm-gray',
   NO_DATA: 'gray',
 };
 
-const MIC_VALUATION_KIND: Record<string, 'red' | 'green' | 'yellow' | 'gray'> = {
+const MIC_VALUATION_KIND: Record<string, 'red' | 'green' | 'warm-gray' | 'gray'> = {
   R: 'red',
   A: 'green',
-  W: 'yellow',
+  W: 'warm-gray',
 };
 
 function LotRow({ lot }: { lot: InspectionLot }) {
