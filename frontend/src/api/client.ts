@@ -145,6 +145,14 @@ export function useUnmappedLocations() {
   });
 }
 
+export function useMappedLocations() {
+  return useQuery<LocationMeta[]>({
+    queryKey: ['coordinates', 'mapped'],
+    queryFn: () => apiFetch('/api/em/coordinates/mapped'),
+    staleTime: 60_000,
+  });
+}
+
 export function useSaveCoordinate() {
   const queryClient = useQueryClient();
 
@@ -154,6 +162,22 @@ export function useSaveCoordinate() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['coordinates'] });
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      queryClient.invalidateQueries({ queryKey: ['heatmap'] });
+    },
+  });
+}
+
+export function useDeleteCoordinate() {
+  const queryClient = useQueryClient();
+
+  return useMutation<unknown, Error, string>({
+    mutationFn: (funcLocId) =>
+      apiFetch(`/api/em/coordinates/${encodeURIComponent(funcLocId)}`, {
+        method: 'DELETE',
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coordinates'] });

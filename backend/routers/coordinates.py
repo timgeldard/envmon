@@ -1,6 +1,8 @@
 """
-GET  /api/em/coordinates/unmapped — functional locations with no X/Y entry
-POST /api/em/coordinates          — upsert a coordinate mapping (admin)
+GET    /api/em/coordinates/unmapped      — functional locations with no X/Y entry
+GET    /api/em/coordinates/mapped        — functional locations that have coordinates
+POST   /api/em/coordinates              — upsert a coordinate mapping (admin)
+DELETE /api/em/coordinates/{func_loc_id} — remove a coordinate mapping (admin)
 
 Unmapped locations are derived by finding all DISTINCT FUNCTIONAL_LOCATION values
 from the inspection point data (type-14 lots, P225) that have no corresponding
@@ -9,7 +11,7 @@ row in em_location_coordinates.
 
 from typing import Optional
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, HTTPException
 
 from backend.schemas.em import CoordinateUpsertRequest, CoordinateUpsertResponse, LocationMeta
 from backend.utils.db import resolve_token, run_sql_async, sql_param
@@ -70,6 +72,63 @@ async def list_unmapped(
         )
         for r in rows
     ]
+
+
+@router.get("/coordinates/mapped", response_model=list[LocationMeta])
+async def list_mapped(
+    x_forwarded_access_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """
+    Return all functional locations that have an entry in em_location_coordinates.
+    Used by the admin mapper to display and reposition existing markers.
+    """
+    token = resolve_token(x_forwarded_access_token, authorization)
+
+    sql = f"""
+        SELECT
+            func_loc_id,
+            floor_id,
+            x_pos,
+            y_pos
+        FROM {COORD_TBL}
+        ORDER BY floor_id, func_loc_id
+    """
+    rows = await run_sql_async(token, sql)
+
+    return [
+        LocationMeta(
+            func_loc_id=r["func_loc_id"],
+            func_loc_name=None,
+            plant_id=PLANT_ID,
+            floor_id=r["floor_id"],
+            x_pos=float(r["x_pos"]),
+            y_pos=float(r["y_pos"]),
+            is_mapped=True,
+        )
+        for r in rows
+    ]
+
+
+@router.delete("/coordinates/{func_loc_id}", status_code=204)
+async def delete_coordinate(
+    func_loc_id: str,
+    x_forwarded_access_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """
+    Remove the coordinate mapping for a functional location.
+    The location will reappear in the unmapped list after deletion.
+    """
+    token = resolve_token(x_forwarded_access_token, authorization)
+
+    params = [sql_param("func_loc_id", func_loc_id)]
+
+    sql = f"""
+        DELETE FROM {COORD_TBL}
+        WHERE func_loc_id = :func_loc_id
+    """
+    await run_sql_async(token, sql, params)
 
 
 @router.post("/coordinates", response_model=CoordinateUpsertResponse)
