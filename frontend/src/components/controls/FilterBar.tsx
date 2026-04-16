@@ -1,4 +1,4 @@
-import { Select, SelectItem, Toggle } from '@carbon/react';
+import { Select, SelectItem, Toggle, Layer } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
 
@@ -14,30 +14,33 @@ export default function FilterBar() {
   const { timeWindow, setTimeWindow, heatmapMode, setHeatmapMode } = useEM();
 
   return (
-    <div className="em-filter-bar">
-      <Select
-        id="em-time-window"
-        labelText="Time window"
-        size="sm"
-        value={String(timeWindow)}
-        onChange={(e) => setTimeWindow(Number(e.target.value) as TimeWindow)}
-      >
-        {TIME_WINDOWS.map(({ value, label }) => (
-          <SelectItem key={value} value={String(value)} text={label} />
-        ))}
-      </Select>
+    <div className="em-filter-bar" role="region" aria-label="Heatmap filters">
+      <Layer>
+        <Select
+          id="em-time-window"
+          labelText="Time window"
+          size="sm"
+          inline
+          value={String(timeWindow)}
+          onChange={(e) => setTimeWindow(Number(e.target.value) as TimeWindow)}
+        >
+          {TIME_WINDOWS.map(({ value, label }) => (
+            <SelectItem key={value} value={String(value)} text={label} />
+          ))}
+        </Select>
 
-      <Toggle
-        id="em-heatmap-mode"
-        labelText="Heatmap mode"
-        labelA="Worst-case"
-        labelB="Risk density"
-        toggled={heatmapMode === 'continuous'}
-        onToggle={(checked: boolean) =>
-          setHeatmapMode(checked ? 'continuous' : 'deterministic')
-        }
-        size="sm"
-      />
+        <Toggle
+          id="em-heatmap-mode"
+          labelText="Heatmap mode"
+          labelA="Deterministic"
+          labelB="Continuous"
+          toggled={heatmapMode === 'continuous'}
+          onToggle={(checked: boolean) =>
+            setHeatmapMode(checked ? 'continuous' : 'deterministic')
+          }
+          size="sm"
+        />
+      </Layer>
     </div>
   );
 }

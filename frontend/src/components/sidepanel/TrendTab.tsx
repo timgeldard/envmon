@@ -80,8 +80,8 @@ export default function TrendTab({ funcLocId }: TrendTabProps) {
     : points;
 
   return (
-    <div style={{ padding: 'var(--cds-spacing-05)' }}>
-      <div style={{ display: 'flex', gap: 'var(--cds-spacing-03)', marginBottom: 'var(--cds-spacing-05)' }}>
+    <div className="em-tab-content">
+      <div className="em-flex-group">
         <Select
           id="trend-mic"
           labelText="MIC"
@@ -109,105 +109,106 @@ export default function TrendTab({ funcLocId }: TrendTabProps) {
       </div>
 
       {!selectedMic && (
-        <p className="cds--body-short-01" style={{ color: 'var(--cds-text-secondary)' }}>
+        <p className="cds--body-short-01 em-secondary-text">
           Select a MIC to view the trend.
         </p>
       )}
 
       {selectedMic && points.length === 0 && (
-        <p className="cds--body-short-01" style={{ color: 'var(--cds-text-secondary)' }}>
+        <p className="cds--body-short-01 em-secondary-text">
           No data in this window.
         </p>
       )}
 
       {selectedMic && points.length > 0 && (
-        <svg
-          width={CHART_W}
-          height={CHART_H}
-          aria-label={`Trend chart for ${selectedMic}`}
-          role="img"
-          style={{ overflow: 'visible', display: 'block' }}
-        >
-          {/* Upper limit line */}
-          {limitPoint?.upper_limit != null && (
+        <div className="em-chart-container">
+          <svg
+            width={CHART_W}
+            height={CHART_H}
+            aria-label={`Trend chart for ${selectedMic}`}
+            role="img"
+          >
+            {/* Upper limit line */}
+            {limitPoint?.upper_limit != null && (
+              <line
+                x1={PAD.left} x2={CHART_W - PAD.right}
+                y1={scaleY(limitPoint.upper_limit)}
+                y2={scaleY(limitPoint.upper_limit)}
+                stroke="var(--cds-support-error)"
+                strokeWidth={1}
+                strokeDasharray="4 2"
+              />
+            )}
+
+            {/* Trend line */}
+            <polyline
+              points={polylinePoints}
+              fill="none"
+              stroke="var(--cds-interactive)"
+              strokeWidth={1.5}
+            />
+
+            {/* Data points coloured by valuation */}
+            {points.map((p, i) => (
+              <circle
+                key={i}
+                cx={scaleX(new Date(p.inspection_date).getTime())}
+                cy={scaleY(p.result_value ?? 0)}
+                r={3}
+                fill={VALUATION_TOKEN[p.valuation ?? ''] ?? 'var(--cds-text-placeholder)'}
+              />
+            ))}
+
+            {/* X axis */}
             <line
               x1={PAD.left} x2={CHART_W - PAD.right}
-              y1={scaleY(limitPoint.upper_limit)}
-              y2={scaleY(limitPoint.upper_limit)}
-              stroke="var(--cds-support-error)"
-              strokeWidth={1}
-              strokeDasharray="4 2"
+              y1={CHART_H - PAD.bottom} y2={CHART_H - PAD.bottom}
+              stroke="var(--cds-border-subtle-01)"
             />
-          )}
 
-          {/* Trend line */}
-          <polyline
-            points={polylinePoints}
-            fill="none"
-            stroke="var(--cds-interactive)"
-            strokeWidth={1.5}
-          />
-
-          {/* Data points coloured by valuation */}
-          {points.map((p, i) => (
-            <circle
-              key={i}
-              cx={scaleX(new Date(p.inspection_date).getTime())}
-              cy={scaleY(p.result_value ?? 0)}
-              r={3}
-              fill={VALUATION_TOKEN[p.valuation ?? ''] ?? 'var(--cds-text-placeholder)'}
+            {/* Y axis */}
+            <line
+              x1={PAD.left} x2={PAD.left}
+              y1={PAD.top} y2={CHART_H - PAD.bottom}
+              stroke="var(--cds-border-subtle-01)"
             />
-          ))}
 
-          {/* X axis */}
-          <line
-            x1={PAD.left} x2={CHART_W - PAD.right}
-            y1={CHART_H - PAD.bottom} y2={CHART_H - PAD.bottom}
-            stroke="var(--cds-border-subtle-01)"
-          />
+            {/* Date ticks */}
+            {tickDates.map((p, i) => {
+              const tx = scaleX(new Date(p.inspection_date).getTime());
+              const dateStr = new Date(p.inspection_date).toLocaleDateString('en-GB', {
+                day: '2-digit', month: 'short',
+              });
+              return (
+                <g key={i}>
+                  <line
+                    x1={tx} x2={tx}
+                    y1={CHART_H - PAD.bottom}
+                    y2={CHART_H - PAD.bottom + 4}
+                    stroke="var(--cds-border-subtle-01)"
+                  />
+                  <text
+                    x={tx}
+                    y={CHART_H - PAD.bottom + 14}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill="var(--cds-text-secondary)"
+                  >
+                    {dateStr}
+                  </text>
+                </g>
+              );
+            })}
 
-          {/* Y axis */}
-          <line
-            x1={PAD.left} x2={PAD.left}
-            y1={PAD.top} y2={CHART_H - PAD.bottom}
-            stroke="var(--cds-border-subtle-01)"
-          />
-
-          {/* Date ticks */}
-          {tickDates.map((p, i) => {
-            const tx = scaleX(new Date(p.inspection_date).getTime());
-            const dateStr = new Date(p.inspection_date).toLocaleDateString('en-GB', {
-              day: '2-digit', month: 'short',
-            });
-            return (
-              <g key={i}>
-                <line
-                  x1={tx} x2={tx}
-                  y1={CHART_H - PAD.bottom}
-                  y2={CHART_H - PAD.bottom + 4}
-                  stroke="var(--cds-border-subtle-01)"
-                />
-                <text
-                  x={tx}
-                  y={CHART_H - PAD.bottom + 14}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill="var(--cds-text-secondary)"
-                >
-                  {dateStr}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Y axis labels */}
-          <text x={PAD.left - 4} y={PAD.top + 4} textAnchor="end" fontSize={9} fill="var(--cds-text-secondary)">
-            {maxVal.toFixed(1)}
-          </text>
-          <text x={PAD.left - 4} y={CHART_H - PAD.bottom} textAnchor="end" fontSize={9} fill="var(--cds-text-secondary)">
-            {minVal.toFixed(1)}
-          </text>
-        </svg>
+            {/* Y axis labels */}
+            <text x={PAD.left - 4} y={PAD.top + 4} textAnchor="end" fontSize={9} fill="var(--cds-text-secondary)">
+              {maxVal.toFixed(1)}
+            </text>
+            <text x={PAD.left - 4} y={CHART_H - PAD.bottom} textAnchor="end" fontSize={9} fill="var(--cds-text-secondary)">
+              {minVal.toFixed(1)}
+            </text>
+          </svg>
+        </div>
       )}
     </div>
   );

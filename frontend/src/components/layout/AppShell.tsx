@@ -9,6 +9,7 @@ import {
   SideNavItems,
   SideNavLink,
   SkipToContent,
+  Content,
 } from '@carbon/react';
 import { Settings, Map } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
@@ -35,8 +36,9 @@ export default function AppShell() {
     <div
       className="em-app"
       style={{
-        '--shell-header-height': '3rem',
-        '--admin-banner-height': '2rem',
+        '--shell-header-height': 'var(--cds-spacing-09, 3rem)',
+        '--admin-banner-height': 'var(--cds-spacing-07, 2rem)',
+        '--side-nav-width': isSideNavExpanded && !adminMode ? '16rem' : '0rem',
       } as React.CSSProperties}
     >
       <SkipToContent href="#main-content" />
@@ -84,11 +86,7 @@ export default function AppShell() {
               >
                 {floor.floor_name}
                 {floor.location_count > 0 && (
-                  <span style={{
-                    marginLeft: 'var(--cds-spacing-03)',
-                    fontSize: 'var(--cds-label-01-font-size, 0.75rem)',
-                    opacity: 0.7,
-                  }}>
+                  <span className="em-side-nav-count">
                     ({floor.location_count})
                   </span>
                 )}
@@ -98,27 +96,14 @@ export default function AppShell() {
         </SideNav>
       )}
 
-      {/* Main content — offset to clear fixed header + optional side nav */}
-      <main
+      <Content
         id="main-content"
-        tabIndex={-1}
-        style={{
-          marginTop: adminMode
-            ? 'calc(var(--shell-header-height) + var(--admin-banner-height))'
-            : 'var(--shell-header-height)',
-          marginLeft: adminMode ? '0' : (isSideNavExpanded ? '16rem' : '0'),
-          height: adminMode
-            ? 'calc(100vh - (var(--shell-header-height) + var(--admin-banner-height)))'
-            : 'calc(100vh - var(--shell-header-height))',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          transition: `margin-left 110ms var(--cds-motion-easing-standard, ease)`,
-        }}
+        className="em-main-content"
+        data-admin-mode={adminMode}
       >
         {!adminMode && <FilterBar />}
 
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div className="em-content-body">
           {adminMode ? (
             <CoordinateMapper />
           ) : (
@@ -129,7 +114,7 @@ export default function AppShell() {
             <LocationPanel />
           )}
         </div>
-      </main>
+      </Content>
     </div>
   );
 }

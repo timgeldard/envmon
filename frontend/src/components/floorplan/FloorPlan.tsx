@@ -76,14 +76,15 @@ export default function FloorPlan() {
         <div style={{
           position: 'absolute', inset: 0, zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(255, 255, 255, 0.5)',
         }}>
-          <Loading description="Loading heatmap…" withOverlay={false} />
+          <Loading description="Loading heatmap..." withOverlay={false} />
         </div>
       )}
 
       {/* Error banner */}
       {isError && (
-        <div style={{ position: 'absolute', top: '1rem', left: '1rem', right: '1rem', zIndex: 10 }}>
+        <div style={{ position: 'absolute', top: 'var(--cds-spacing-05)', left: 'var(--cds-spacing-05)', right: 'var(--cds-spacing-05)', zIndex: 10 }}>
           <InlineNotification
             kind="error"
             title="Failed to load heatmap"
@@ -102,7 +103,8 @@ export default function FloorPlan() {
       <img
         key={svgUrl}
         src={svgUrl}
-        alt={`Floor ${activeFloor} plan`}
+        alt={`Floor plan for ${activeFloor}`}
+        role="img"
         style={{
           position: 'absolute',
           inset: 0,
