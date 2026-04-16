@@ -1,14 +1,23 @@
 /**
  * FloorPlan — renders the SVG floor plan for the active floor and overlays
- * heatmap markers as an absolutely-positioned SVG layer.
+ * heatmap markers.
  *
- * The SVG floor plan images have viewBox="0 0 1021.6 722.48".
- * Markers are positioned using relative % coordinates stored in the DB,
- * which are converted to SVG units at render time so they stay anchored
- * regardless of browser zoom.
+ * Layout:
+ *   <div.em-floorplan-container>          position:absolute inset:0
+ *     <img key={svgUrl}>                  floor plan background, object-fit:contain
+ *     <svg viewBox="0 0 1021.6 722.48">   marker overlay, same aspect ratio
+ *       <Marker … />
+ *
+ * Both the <img> and the <svg> use the same viewBox aspect ratio and
+ * xMidYMid meet alignment, so % coordinates from the DB map correctly to
+ * the visible floor plan area regardless of container size.
+ *
+ * The <img key={svgUrl}> forces a fresh browser fetch on every floor change,
+ * avoiding the browser issue where updating href on an SVG <image> element
+ * in place does not trigger a reload.
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Loading, InlineNotification } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import { useHeatmap } from '~/api/client';
@@ -16,11 +25,6 @@ import Marker from './Marker';
 import Tooltip from './Tooltip';
 import type { MarkerData } from '~/types';
 
-// SVG viewBox dimensions (same for all three floor plans)
-const SVG_WIDTH = 1021.6;
-const SVG_HEIGHT = 722.48;
-
-// Import SVG floor plans as asset URLs via Vite's ?url suffix.
 import floor1Url from '~/assets/floor1.svg?url';
 import floor2Url from '~/assets/floor2.svg?url';
 import floor3Url from '~/assets/floor3.svg?url';
@@ -31,9 +35,12 @@ const FLOOR_SVG: Record<string, string> = {
   F3: floor3Url,
 };
 
+// ViewBox dimensions — must match the floor plan SVGs
+const SVG_WIDTH = 1021.6;
+const SVG_HEIGHT = 722.48;
+
 export default function FloorPlan() {
   const { activeFloor, heatmapMode, timeWindow, setSelectedLocId } = useEM();
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const [tooltip, setTooltip] = useState<{
     marker: MarkerData;
@@ -48,16 +55,13 @@ export default function FloorPlan() {
   );
 
   const handleMarkerClick = useCallback(
-    (marker: MarkerData) => {
-      setSelectedLocId(marker.func_loc_id);
-    },
+    (marker: MarkerData) => setSelectedLocId(marker.func_loc_id),
     [setSelectedLocId],
   );
 
   const handleMouseEnter = useCallback(
-    (marker: MarkerData, e: React.MouseEvent) => {
-      setTooltip({ marker, x: e.clientX, y: e.clientY });
-    },
+    (marker: MarkerData, e: React.MouseEvent) =>
+      setTooltip({ marker, x: e.clientX, y: e.clientY }),
     [],
   );
 
@@ -66,13 +70,18 @@ export default function FloorPlan() {
   const svgUrl = FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1'];
 
   return (
-    <div className="em-floorplan-container" ref={containerRef}>
+    <div className="em-floorplan-container">
+      {/* Loading spinner */}
       {isLoading && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           <Loading description="Loading heatmap…" withOverlay={false} />
         </div>
       )}
 
+      {/* Error banner */}
       {isError && (
         <div style={{ position: 'absolute', top: '1rem', left: '1rem', right: '1rem', zIndex: 10 }}>
           <InlineNotification
@@ -84,22 +93,43 @@ export default function FloorPlan() {
         </div>
       )}
 
-      {/* Floor plan SVG as background image */}
+      {/*
+        Floor plan background — standard <img> with key={svgUrl} so the
+        browser unmounts and reloads the image on every floor switch.
+        object-fit:contain letterboxes the image; the SVG overlay below
+        uses the same aspect ratio so markers stay aligned.
+      */}
+      <img
+        key={svgUrl}
+        src={svgUrl}
+        alt={`Floor ${activeFloor} plan`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          objectPosition: 'center',
+          display: 'block',
+        }}
+      />
+
+      {/*
+        Marker overlay SVG — same viewBox + preserveAspectRatio as the
+        floor plan image, so SVG coordinates map 1:1 to the visible image.
+      */}
       <svg
-        className="em-floorplan-svg"
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
         preserveAspectRatio="xMidYMid meet"
-        aria-label={`Floor plan for floor ${activeFloor}`}
+        aria-label={`Heatmap markers for floor ${activeFloor}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'visible',
+        }}
       >
-        <image
-          href={svgUrl}
-          x={0}
-          y={0}
-          width={SVG_WIDTH}
-          height={SVG_HEIGHT}
-        />
-
-        {/* Marker layer — rendered inside the same SVG coordinate space */}
         {data?.markers.map((marker) => (
           <Marker
             key={marker.func_loc_id}
@@ -114,13 +144,9 @@ export default function FloorPlan() {
         ))}
       </svg>
 
-      {/* Tooltip — rendered outside SVG to avoid SVG coordinate constraints */}
+      {/* Tooltip — outside SVG so it's not clipped */}
       {tooltip && (
-        <Tooltip
-          marker={tooltip.marker}
-          x={tooltip.x}
-          y={tooltip.y}
-        />
+        <Tooltip marker={tooltip.marker} x={tooltip.x} y={tooltip.y} />
       )}
     </div>
   );

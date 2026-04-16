@@ -121,26 +121,43 @@ export default function CoordinateMapper() {
 
       {/* Drop canvas — SVG matching FloorPlan viewBox so coordinates are identical */}
       <div className="em-mapper-canvas">
+        {/*
+          Floor plan background — <img key> forces browser reload on floor change.
+          Positioned to fill the canvas; object-fit:contain letterboxes identically
+          to the marker SVG overlay below.
+        */}
+        <img
+          key={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
+          src={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
+          alt={`Floor ${activeFloor} plan`}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Drop target SVG — same viewBox so getScreenCTM gives correct coordinates */}
         <svg
           ref={svgRef}
           viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
-          width="100%"
-          height="100%"
-          style={{ display: 'block', cursor: draggingId ? 'crosshair' : 'default' }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            cursor: draggingId ? 'crosshair' : 'default',
+          }}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
-          {/* Floor plan image */}
-          <image
-            href={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
-            x={0}
-            y={0}
-            width={SVG_WIDTH}
-            height={SVG_HEIGHT}
-          />
-
-          {/* Drop hint overlay when dragging */}
+          {/* Drop hint border when dragging */}
           {draggingId && (
             <rect
               x={0}
