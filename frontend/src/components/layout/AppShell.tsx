@@ -57,7 +57,7 @@ export default function AppShell() {
       </Header>
 
       {adminMode && (
-        <div className="em-admin-banner" aria-hidden="true">
+        <div className="em-admin-banner" role="status">
           Admin mode — Coordinate Mapping
         </div>
       )}

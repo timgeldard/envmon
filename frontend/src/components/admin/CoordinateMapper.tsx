@@ -126,13 +126,14 @@ export default function CoordinateMapper() {
 
   // Final filtered list (level 5 locations after all filters applied)
   const filteredUnmapped = useMemo(() => {
+    const lowerQuery = searchQuery.toLowerCase();
     return unmapped.filter((u) => {
       const parts = parseLevels(u.func_loc_id);
       if (l1 && parts[0] !== l1) return false;
       if (l2 && parts[1] !== l2) return false;
       if (l3 && parts[2] !== l3) return false;
       if (l4 && parts[3] !== l4) return false;
-      if (searchQuery && !u.func_loc_id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (lowerQuery && !u.func_loc_id.toLowerCase().includes(lowerQuery)) return false;
       return true;
     });
   }, [unmapped, l1, l2, l3, l4, searchQuery]);
@@ -286,7 +287,11 @@ export default function CoordinateMapper() {
 
               {!loadingUnmapped && filteredUnmapped.length === 0 && (
                 <p style={{ color: '#6f6f6f', fontSize: '0.8rem' }}>
-                  {unmapped.length === 0 ? 'All locations are mapped.' : 'No locations match the selected filters.'}
+                  {unmapped.length === 0
+                    ? 'All locations are mapped.'
+                    : searchQuery
+                      ? 'No locations match the selected filters or search.'
+                      : 'No locations match the selected filters.'}
                 </p>
               )}
 
