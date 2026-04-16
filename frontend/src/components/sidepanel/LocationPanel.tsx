@@ -1,10 +1,9 @@
 /**
  * LocationPanel — right-hand side panel shown when a marker is selected.
- * Contains Trend and Lots tabs per URS-D01.
  */
 
-import React, { useState } from 'react';
-import { Tabs, Tab, TabList, TabPanels, TabPanel, IconButton } from '@carbon/react';
+import React from 'react';
+import { Tabs, Tab, TabList, TabPanels, TabPanel, IconButton, Layer } from '@carbon/react';
 import { Close } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
 import TrendTab from './TrendTab';
@@ -20,37 +19,41 @@ export default function LocationPanel() {
       <div className="em-side-panel__header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#6f6f6f', marginBottom: '0.25rem' }}>
+            <p
+              className="cds--label"
+              style={{ marginBottom: 'var(--cds-spacing-02)', color: 'var(--cds-text-secondary)' }}
+            >
               Functional location
-            </div>
-            <div style={{ fontWeight: 600 }}>{selectedLocId}</div>
+            </p>
+            <p className="cds--heading-compact-01">{selectedLocId}</p>
           </div>
           <IconButton
-            label="Close"
+            label="Close panel"
+            renderIcon={Close}
             kind="ghost"
             size="sm"
             onClick={() => setSelectedLocId(null)}
-          >
-            <Close size={16} />
-          </IconButton>
+          />
         </div>
       </div>
 
       <div className="em-side-panel__body">
-        <Tabs>
-          <TabList aria-label="Location detail tabs">
-            <Tab>Trend</Tab>
-            <Tab>Lots</Tab>
-          </TabList>
-          <TabPanels>
-            <TabPanel>
-              <TrendTab funcLocId={selectedLocId} />
-            </TabPanel>
-            <TabPanel>
-              <LotsTab funcLocId={selectedLocId} />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
+        <Layer>
+          <Tabs>
+            <TabList aria-label="Location detail tabs">
+              <Tab>Trend</Tab>
+              <Tab>Lots</Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel>
+                <TrendTab funcLocId={selectedLocId} />
+              </TabPanel>
+              <TabPanel>
+                <LotsTab funcLocId={selectedLocId} />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </Layer>
       </div>
     </div>
   );

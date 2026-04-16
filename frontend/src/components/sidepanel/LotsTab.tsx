@@ -1,17 +1,21 @@
 /**
- * LotsTab — list of inspection lots for the selected location.
- * Clicking a lot expands its MIC results.
+ * LotsTab — inspection lots list with expandable MIC results.
+ * Uses Carbon Table directly. MIC detail uses StructuredList.
  */
 
 import React, { useState } from 'react';
 import {
-  DataTable,
   Table,
   TableHead,
   TableRow,
   TableHeader,
   TableBody,
   TableCell,
+  StructuredListWrapper,
+  StructuredListHead,
+  StructuredListRow,
+  StructuredListCell,
+  StructuredListBody,
   Tag,
   Loading,
 } from '@carbon/react';
@@ -24,10 +28,16 @@ interface LotsTabProps {
 }
 
 const STATUS_KIND: Record<string, 'red' | 'green' | 'yellow' | 'gray'> = {
-  FAIL: 'red',
-  PASS: 'green',
+  FAIL:    'red',
+  PASS:    'green',
   PENDING: 'yellow',
   NO_DATA: 'gray',
+};
+
+const MIC_VALUATION_KIND: Record<string, 'red' | 'green' | 'yellow' | 'gray'> = {
+  R: 'red',
+  A: 'green',
+  W: 'yellow',
 };
 
 function LotRow({ lot }: { lot: InspectionLot }) {
@@ -39,6 +49,7 @@ function LotRow({ lot }: { lot: InspectionLot }) {
       <TableRow
         style={{ cursor: 'pointer' }}
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
       >
         <TableCell>{lot.lot_id}</TableCell>
         <TableCell>{lot.inspection_start_date ?? '—'}</TableCell>
@@ -51,40 +62,46 @@ function LotRow({ lot }: { lot: InspectionLot }) {
 
       {expanded && (
         <TableRow>
-          <TableCell colSpan={3} style={{ background: '#f4f4f4', padding: '0.5rem 1rem' }}>
-            {isLoading && <Loading description="Loading MIC results…" withOverlay={false} small />}
+          <TableCell
+            colSpan={3}
+            style={{
+              background: 'var(--cds-layer-01)',
+              padding: 'var(--cds-spacing-03) var(--cds-spacing-05)',
+            }}
+          >
+            {isLoading && (
+              <Loading description="Loading MIC results…" withOverlay={false} small />
+            )}
             {detail && detail.mic_results.length === 0 && (
-              <p style={{ color: '#6f6f6f', fontSize: '0.8rem' }}>No MIC results.</p>
+              <p className="cds--label" style={{ color: 'var(--cds-text-secondary)' }}>
+                No MIC results.
+              </p>
             )}
             {detail && detail.mic_results.length > 0 && (
-              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '0.25rem' }}>MIC</th>
-                    <th style={{ textAlign: 'right', padding: '0.25rem' }}>Result</th>
-                    <th style={{ textAlign: 'right', padding: '0.25rem' }}>Limit</th>
-                    <th style={{ padding: '0.25rem' }}>Val.</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <StructuredListWrapper isCondensed aria-label="MIC results">
+                <StructuredListHead>
+                  <StructuredListRow head>
+                    <StructuredListCell head>MIC</StructuredListCell>
+                    <StructuredListCell head>Result</StructuredListCell>
+                    <StructuredListCell head>Limit</StructuredListCell>
+                    <StructuredListCell head>Val.</StructuredListCell>
+                  </StructuredListRow>
+                </StructuredListHead>
+                <StructuredListBody>
                   {detail.mic_results.map((mic) => (
-                    <tr key={mic.mic_id}>
-                      <td style={{ padding: '0.25rem' }}>{mic.mic_name}</td>
-                      <td style={{ textAlign: 'right', padding: '0.25rem' }}>
-                        {mic.result_value ?? '—'}
-                      </td>
-                      <td style={{ textAlign: 'right', padding: '0.25rem' }}>
-                        {mic.upper_limit ?? '—'}
-                      </td>
-                      <td style={{ padding: '0.25rem' }}>
-                        <Tag type={STATUS_KIND[mic.valuation === 'R' ? 'FAIL' : mic.valuation === 'A' ? 'PASS' : 'NO_DATA'] ?? 'gray'} size="sm">
+                    <StructuredListRow key={mic.mic_id}>
+                      <StructuredListCell>{mic.mic_name}</StructuredListCell>
+                      <StructuredListCell noWrap>{mic.result_value ?? '—'}</StructuredListCell>
+                      <StructuredListCell noWrap>{mic.upper_limit ?? '—'}</StructuredListCell>
+                      <StructuredListCell>
+                        <Tag type={MIC_VALUATION_KIND[mic.valuation ?? ''] ?? 'gray'} size="sm">
                           {mic.valuation ?? '?'}
                         </Tag>
-                      </td>
-                    </tr>
+                      </StructuredListCell>
+                    </StructuredListRow>
                   ))}
-                </tbody>
-              </table>
+                </StructuredListBody>
+              </StructuredListWrapper>
             )}
           </TableCell>
         </TableRow>
@@ -98,35 +115,38 @@ export default function LotsTab({ funcLocId }: LotsTabProps) {
   const { data: lots = [], isLoading } = useLots(funcLocId, timeWindow);
 
   if (isLoading) {
-    return <Loading description="Loading lots…" withOverlay={false} small />;
+    return (
+      <div style={{ padding: 'var(--cds-spacing-05)' }}>
+        <Loading description="Loading lots…" withOverlay={false} small />
+      </div>
+    );
   }
 
   if (lots.length === 0) {
     return (
-      <p style={{ padding: '1rem', color: '#6f6f6f', fontSize: '0.875rem' }}>
+      <p
+        className="cds--body-short-01"
+        style={{ padding: 'var(--cds-spacing-05)', color: 'var(--cds-text-secondary)' }}
+      >
         No inspection lots in this time window.
       </p>
     );
   }
 
   return (
-    <DataTable rows={[]} headers={[]}>
-      {() => (
-        <Table size="sm" useZebraStyles>
-          <TableHead>
-            <TableRow>
-              <TableHeader>Lot ID</TableHeader>
-              <TableHeader>Start date</TableHeader>
-              <TableHeader>Status</TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {lots.map((lot) => (
-              <LotRow key={lot.lot_id} lot={lot} />
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </DataTable>
+    <Table size="sm" useZebraStyles aria-label="Inspection lots">
+      <TableHead>
+        <TableRow>
+          <TableHeader>Lot ID</TableHeader>
+          <TableHeader>Start date</TableHeader>
+          <TableHeader>Status</TableHeader>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {lots.map((lot) => (
+          <LotRow key={lot.lot_id} lot={lot} />
+        ))}
+      </TableBody>
+    </Table>
   );
 }

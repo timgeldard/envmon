@@ -8,8 +8,8 @@ interface TooltipProps {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  PASS: 'Pass',
-  FAIL: 'Fail',
+  PASS:    'Pass',
+  FAIL:    'Fail',
   PENDING: 'Pending',
   NO_DATA: 'No data',
 };
@@ -23,6 +23,7 @@ export default function Tooltip({ marker, x, y }: TooltipProps) {
       className="em-tooltip"
       style={{ left: x + 12, top: y - 8 }}
       role="tooltip"
+      aria-live="polite"
     >
       <div style={{ fontWeight: 600 }}>{label}</div>
       <div>Status: {status}</div>
@@ -32,7 +33,7 @@ export default function Tooltip({ marker, x, y }: TooltipProps) {
         </div>
       )}
       {marker.risk_score !== null && (
-        <div>Risk score: {marker.risk_score.toFixed(2)}</div>
+        <div>Risk score: {marker.risk_score?.toFixed(2)}</div>
       )}
     </div>
   );

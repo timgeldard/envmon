@@ -4,7 +4,6 @@ import type { MarkerData, HeatmapMode } from '~/types';
 interface MarkerProps {
   marker: MarkerData;
   mode: HeatmapMode;
-  /** SVG viewport dimensions — used to convert % → SVG units */
   svgWidth: number;
   svgHeight: number;
   onClick: (marker: MarkerData) => void;
@@ -12,11 +11,12 @@ interface MarkerProps {
   onMouseLeave: () => void;
 }
 
-const STATUS_COLOUR: Record<string, string> = {
-  PASS: '#24a148',
-  FAIL: '#da1e28',
-  PENDING: '#f1c21b',
-  NO_DATA: '#8d8d8d',
+/** Map status to CSS class using Carbon support tokens (defined in index.css) */
+const STATUS_CLASS: Record<string, string> = {
+  PASS:    'em-marker--pass',
+  FAIL:    'em-marker--fail',
+  PENDING: 'em-marker--pending',
+  NO_DATA: 'em-marker--no-data',
 };
 
 const BASE_RADIUS = 10;
@@ -33,9 +33,8 @@ export default function Marker({
 }: MarkerProps) {
   const cx = (marker.x_pos / 100) * svgWidth;
   const cy = (marker.y_pos / 100) * svgHeight;
-  const colour = STATUS_COLOUR[marker.status] ?? '#8d8d8d';
+  const statusClass = STATUS_CLASS[marker.status] ?? 'em-marker--no-data';
 
-  // Continuous mode: scale radius and add glow based on risk score
   let radius = BASE_RADIUS;
   let glowOpacity = 0;
   if (mode === 'continuous' && marker.risk_score !== null) {
@@ -46,7 +45,7 @@ export default function Marker({
 
   return (
     <g
-      style={{ cursor: 'pointer', pointerEvents: 'all' }}
+      className="em-marker-group"
       onClick={() => onClick(marker)}
       onMouseEnter={(e) => onMouseEnter(marker, e)}
       onMouseLeave={onMouseLeave}
@@ -59,7 +58,7 @@ export default function Marker({
           cx={cx}
           cy={cy}
           r={radius + 6}
-          fill={colour}
+          className={statusClass}
           opacity={glowOpacity}
         />
       )}
@@ -69,21 +68,21 @@ export default function Marker({
         cx={cx}
         cy={cy}
         r={radius}
-        fill={colour}
-        stroke="#ffffff"
+        className={statusClass}
+        stroke="var(--cds-background)"
         strokeWidth={1.5}
       />
 
-      {/* Fail indicator — exclamation mark */}
+      {/* Fail indicator */}
       {marker.status === 'FAIL' && (
         <text
           x={cx}
           y={cy + 4}
           textAnchor="middle"
           fontSize={12}
-          fill="#ffffff"
-          fontWeight="bold"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
+          fill="var(--cds-text-on-color)"
+          fontWeight="600"
+          className="em-marker-label"
         >
           !
         </text>

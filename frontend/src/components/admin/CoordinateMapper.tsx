@@ -49,8 +49,8 @@ const SVG_HEIGHT = 722.48;
 const MARKER_R = 10;
 const MARKER_COLOURS: Record<string, string> = {
   F1: '#0f62fe',
-  F2: '#6929c4',
-  F3: '#005d5d',
+  F2: '#8a3ffc',
+  F3: '#007d79',
 };
 
 type DragSource = { funcLocId: string };
@@ -205,8 +205,8 @@ export default function CoordinateMapper() {
       {/* Sidebar                                                             */}
       {/* ------------------------------------------------------------------ */}
       <div className="em-mapper-sidebar">
-        <Tabs>
-          <TabList aria-label="Coordinate mapping tabs" contained>
+        <Tabs contained>
+          <TabList aria-label="Coordinate mapping tabs">
             <Tab>Unmapped ({unmapped.length})</Tab>
             <Tab>Mapped ({mapped.length})</Tab>
           </TabList>
@@ -264,7 +264,7 @@ export default function CoordinateMapper() {
                 </Select>
               </div>
 
-              <div style={{ fontSize: '0.7rem', color: '#6f6f6f', marginBottom: '0.5rem' }}>
+              <div className="em-hierarchy-count">
                 {filteredUnmapped.length} location{filteredUnmapped.length !== 1 ? 's' : ''}
               </div>
 
@@ -285,7 +285,7 @@ export default function CoordinateMapper() {
                   onDragEnd={() => setDragging(null)}
                   title="Drag onto floor plan to map"
                 >
-                  <Move size={12} style={{ marginRight: '0.25rem', verticalAlign: 'middle', flexShrink: 0 }} />
+                  <Move size={12} style={{ marginRight: 'var(--cds-spacing-02)', verticalAlign: 'middle', flexShrink: 0 }} />
                   {loc.func_loc_id}
                 </div>
               ))}
@@ -311,12 +311,12 @@ export default function CoordinateMapper() {
                     title={`Floor ${loc.floor_id} — drag to reposition`}
                     style={{ flex: 1, marginBottom: 0 }}
                   >
-                    <Move size={12} style={{ marginRight: '0.25rem', verticalAlign: 'middle', flexShrink: 0 }} />
+                    <Move size={12} style={{ marginRight: 'var(--cds-spacing-02)', verticalAlign: 'middle', flexShrink: 0 }} />
                     <span style={{ flex: 1 }}>{loc.func_loc_id}</span>
                     <span className="em-floor-badge">{loc.floor_id}</span>
                   </div>
                   <Button
-                    kind="ghost"
+                    kind="danger--ghost"
                     size="sm"
                     hasIconOnly
                     renderIcon={TrashCan}
@@ -324,7 +324,7 @@ export default function CoordinateMapper() {
                     tooltipPosition="left"
                     onClick={() => handleUnmap(loc.func_loc_id)}
                     disabled={isDeleting}
-                    style={{ flexShrink: 0, color: '#da1e28' }}
+                    style={{ flexShrink: 0 }}
                   />
                 </div>
               ))}
@@ -341,7 +341,7 @@ export default function CoordinateMapper() {
         <div className="em-mapper-floor-bar">
           <Select
             id="mapper-floor-select"
-            labelText=""
+            labelText="Select floor"
             hideLabel
             size="sm"
             value={activeFloor}
@@ -352,7 +352,7 @@ export default function CoordinateMapper() {
               <SelectItem key={id} value={id} text={label} />
             ))}
           </Select>
-          <span style={{ fontSize: '0.75rem', color: '#6f6f6f' }}>
+          <span className="em-mapper-floor-count">
             {floorMapped.length} location{floorMapped.length !== 1 ? 's' : ''} on this floor
           </span>
         </div>
@@ -438,7 +438,7 @@ export default function CoordinateMapper() {
         {(isSaving || isDeleting) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 10,
-            background: 'rgba(255,255,255,0.55)',
+            background: 'var(--cds-overlay)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Loading description="Saving…" withOverlay={false} />
