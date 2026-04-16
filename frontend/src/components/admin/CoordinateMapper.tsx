@@ -18,7 +18,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Tag, InlineNotification, Loading, Button,
   Tabs, Tab, TabList, TabPanels, TabPanel,
-  Select, SelectItem,
+  Select, SelectItem, Search,
 } from '@carbon/react';
 import { TrashCan, Move } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
@@ -79,6 +79,7 @@ export default function CoordinateMapper() {
   const [l2, setL2] = useState('');
   const [l3, setL3] = useState('');
   const [l4, setL4] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [dragging, setDragging] = useState<DragSource | null>(null);
   const [notification, setNotification] = useState<{
@@ -131,9 +132,10 @@ export default function CoordinateMapper() {
       if (l2 && parts[1] !== l2) return false;
       if (l3 && parts[2] !== l3) return false;
       if (l4 && parts[3] !== l4) return false;
+      if (searchQuery && !u.func_loc_id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [unmapped, l1, l2, l3, l4]);
+  }, [unmapped, l1, l2, l3, l4, searchQuery]);
 
   // Reset child filters when parent changes
   const handleL1 = (v: string) => { setL1(v); setL2(''); setL3(''); setL4(''); };
@@ -205,7 +207,7 @@ export default function CoordinateMapper() {
       {/* Sidebar                                                             */}
       {/* ------------------------------------------------------------------ */}
       <div className="em-mapper-sidebar">
-        <Tabs contained>
+        <Tabs>
           <TabList aria-label="Coordinate mapping tabs">
             <Tab>Unmapped ({unmapped.length})</Tab>
             <Tab>Mapped ({mapped.length})</Tab>
@@ -262,6 +264,18 @@ export default function CoordinateMapper() {
                   <SelectItem value="" text="All" />
                   {l4Options.map((v) => <SelectItem key={v} value={v} text={v} />)}
                 </Select>
+              </div>
+
+              <div className="em-mapper-search">
+                <Search
+                  id="mapper-search"
+                  labelText="Search locations"
+                  placeholder="Search by ID…"
+                  size="sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClear={() => setSearchQuery('')}
+                />
               </div>
 
               <div className="em-hierarchy-count">
