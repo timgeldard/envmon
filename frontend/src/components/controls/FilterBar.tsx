@@ -1,4 +1,4 @@
-import { Select, SelectItem, Toggle, Layer } from '@carbon/react';
+import { Select, SelectItem, Toggle, Layer, Slider } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
 
@@ -11,11 +11,25 @@ const TIME_WINDOWS: { value: TimeWindow; label: string }[] = [
 ];
 
 export default function FilterBar() {
-  const { timeWindow, setTimeWindow, heatmapMode, setHeatmapMode } = useEM();
+  const {
+    timeWindow, setTimeWindow,
+    heatmapMode, setHeatmapMode,
+    historicalDate, setHistoricalDate,
+  } = useEM();
+
+  const handleSliderChange = ({ value }: { value: number }) => {
+    if (value === 0) {
+      setHistoricalDate(null);
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() - value);
+      setHistoricalDate(d.toISOString().split('T')[0]);
+    }
+  };
 
   return (
     <div className="em-filter-bar" role="region" aria-label="Heatmap filters">
-      <Layer>
+      <Layer style={{ display: 'flex', alignItems: 'center', gap: 'var(--cds-spacing-05)', flex: 1 }}>
         <Select
           id="em-time-window"
           labelText="Time window"
@@ -40,6 +54,19 @@ export default function FilterBar() {
           }
           size="sm"
         />
+
+        <div style={{ flex: 1, maxWidth: '24rem', marginLeft: 'var(--cds-spacing-07)' }}>
+          <Slider
+            id="time-travel-scrub"
+            labelText={historicalDate ? `Viewing: ${historicalDate}` : 'Scrub history (Today)'}
+            max={timeWindow}
+            min={0}
+            step={1}
+            value={historicalDate ? Math.floor((new Date().getTime() - new Date(historicalDate).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+            onChange={handleSliderChange}
+            hideTextInput
+          />
+        </div>
       </Layer>
     </div>
   );

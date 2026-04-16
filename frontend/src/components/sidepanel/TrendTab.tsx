@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { Select, SelectItem, Loading } from '@carbon/react';
+import { Select, SelectItem, SkeletonText, SkeletonPlaceholder } from '@carbon/react';
 import { useTrends, useMics } from '~/api/client';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
@@ -44,8 +44,16 @@ export default function TrendTab({ funcLocId }: TrendTabProps) {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 'var(--cds-spacing-05)' }}>
-        <Loading description="Loading trend…" withOverlay={false} small />
+      <div className="em-tab-content">
+        <div className="em-flex-group">
+          <div style={{ flex: 1 }}>
+            <SkeletonText heading />
+          </div>
+          <div style={{ flex: 1 }}>
+            <SkeletonText heading />
+          </div>
+        </div>
+        <SkeletonPlaceholder style={{ width: '100%', height: CHART_H, marginTop: 'var(--cds-spacing-05)' }} />
       </div>
     );
   }

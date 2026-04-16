@@ -40,7 +40,7 @@ const SVG_WIDTH = 1021.6;
 const SVG_HEIGHT = 722.48;
 
 export default function FloorPlan() {
-  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId } = useEM();
+  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme } = useEM();
 
   const [tooltip, setTooltip] = useState<{
     marker: MarkerData;
@@ -52,6 +52,7 @@ export default function FloorPlan() {
     activeFloor,
     heatmapMode,
     timeWindow,
+    historicalDate,
   );
 
   const handleMarkerClick = useCallback(
@@ -76,7 +77,7 @@ export default function FloorPlan() {
         <div style={{
           position: 'absolute', inset: 0, zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(255, 255, 255, 0.5)',
+          background: theme === 'g100' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)',
         }}>
           <Loading description="Loading heatmap..." withOverlay={false} />
         </div>

@@ -61,15 +61,17 @@ export function useHeatmap(
   floorId: string,
   mode: HeatmapMode,
   timeWindowDays: number,
+  asOfDate?: string | null,
 ) {
   const params = new URLSearchParams({
     floor_id: floorId,
     mode,
     time_window_days: String(timeWindowDays),
   });
+  if (asOfDate) params.set('as_of_date', asOfDate);
 
   return useQuery<HeatmapResponse>({
-    queryKey: ['heatmap', floorId, mode, timeWindowDays],
+    queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate],
     queryFn: () => apiFetch(`/api/em/heatmap?${params}`),
     staleTime: 5 * 60_000,
     enabled: Boolean(floorId),
@@ -129,6 +131,15 @@ export function useLotDetail(lotId: string | null) {
     queryKey: ['lot-detail', lotId],
     queryFn: () => apiFetch(`/api/em/lots/${lotId}`),
     enabled: Boolean(lotId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useLocationSummary(funcLocId: string | null) {
+  return useQuery<any>({
+    queryKey: ['location-summary', funcLocId],
+    queryFn: () => apiFetch(`/api/em/locations/${encodeURIComponent(funcLocId!)}/summary`),
+    enabled: Boolean(funcLocId),
     staleTime: 5 * 60_000,
   });
 }

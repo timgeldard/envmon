@@ -67,6 +67,12 @@ class LocationMeta(BaseModel):
     is_mapped: bool
 
 
+class LocationSummary(BaseModel):
+    meta: LocationMeta
+    mics: list[str]
+    recent_lots: list[InspectionLot]
+
+
 # ---------------------------------------------------------------------------
 # Trends
 # ---------------------------------------------------------------------------

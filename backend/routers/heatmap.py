@@ -68,16 +68,21 @@ async def get_heatmap(
     floor_id: str,
     mode: Literal["deterministic", "continuous"] = Query("deterministic"),
     time_window_days: int = Query(90, ge=1, le=365),
+    as_of_date: Optional[str] = Query(None, description="ISO date to view heatmap as of"),
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
     token = resolve_token(x_forwarded_access_token, authorization)
 
-    date_from = (date.today() - timedelta(days=time_window_days)).isoformat()
+    reference_date = date.fromisoformat(as_of_date) if as_of_date else date.today()
+    date_from = (reference_date - timedelta(days=time_window_days)).isoformat()
+    date_to = reference_date.isoformat()
+
     params = [
         sql_param("floor_id", floor_id),
         sql_param("plant_id", PLANT_ID),
         sql_param("date_from", date_from),
+        sql_param("date_to", date_to),
     ]
 
     # One row per (functional_location, lot) — worst valuation per lot aggregated in SQL.
@@ -115,6 +120,7 @@ async def get_heatmap(
            AND lot.PLANT_ID = :plant_id
            AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
            AND lot.CREATED_DATE >= :date_from
+           AND lot.CREATED_DATE <= :date_to
         LEFT JOIN {RESULT_TBL} r
             ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
            AND ip.OPERATION_ID      = r.OPERATION_ID
@@ -163,7 +169,7 @@ async def get_heatmap(
                 status = "PASS"
             risk_score = None
         else:
-            risk_score = _risk_score(lots, today)
+            risk_score = _risk_score(lots, reference_date)
             if total_lots == 0:
                 status = "NO_DATA"
             elif fail_count > 0:

@@ -124,6 +124,12 @@ body,
   z-index: 200;
   display: flex;
   flex-direction: column;
+  transition: width 240ms var(--cds-motion-easing-standard, ease);
+
+  &--expanded {
+    width: 40rem; /* Wide view for detailed trends/tables */
+    max-width: 80vw;
+  }
 }
 
 .em-side-panel__header {

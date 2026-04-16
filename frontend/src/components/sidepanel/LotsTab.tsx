@@ -17,7 +17,8 @@ import {
   StructuredListCell,
   StructuredListBody,
   Tag,
-  Loading,
+  DataTableSkeleton,
+  SkeletonText,
   Layer,
 } from '@carbon/react';
 import { useLots, useLotDetail } from '~/api/client';
@@ -67,7 +68,9 @@ function LotRow({ lot }: { lot: InspectionLot }) {
             <Layer>
               <div className="em-expanded-row-content">
                 {isLoading && (
-                  <Loading description="Loading MIC results…" withOverlay={false} small />
+                  <div style={{ padding: 'var(--cds-spacing-03) 0' }}>
+                    <SkeletonText paragraph lineCount={3} />
+                  </div>
                 )}
                 {detail && detail.mic_results.length === 0 && (
                   <p className="cds--label em-side-panel__label">
@@ -115,8 +118,17 @@ export default function LotsTab({ funcLocId }: LotsTabProps) {
 
   if (isLoading) {
     return (
-      <div className="em-tab-content">
-        <Loading description="Loading lots…" withOverlay={false} small />
+      <div className="em-tab-content" style={{ paddingTop: 0 }}>
+        <DataTableSkeleton
+          columnCount={3}
+          rowCount={5}
+          headers={[
+            { key: 'id', header: 'Lot ID' },
+            { key: 'date', header: 'Start date' },
+            { key: 'status', header: 'Status' },
+          ]}
+          size="sm"
+        />
       </div>
     );
   }

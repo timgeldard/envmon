@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
 
-from backend.schemas.em import CoordinateUpsertRequest, CoordinateUpsertResponse, LocationMeta
+from backend.schemas.em import CoordinateUpsertRequest, CoordinateUpsertResponse, LocationMeta, LocationSummary
 from backend.utils.db import resolve_token, run_sql_async, sql_param
 from backend.utils.em_config import (
     COORD_TBL,
@@ -108,6 +108,132 @@ async def list_mapped(
         )
         for r in rows
     ]
+
+
+@router.get("/locations/hierarchy")
+async def get_hierarchy(
+    x_forwarded_access_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """
+    Return a structured hierarchy of unmapped functional locations.
+    Enables cascading filters (L1 -> L2 -> L3 -> L4) in the admin UI.
+    """
+    token = resolve_token(x_forwarded_access_token, authorization)
+
+    params = [sql_param("plant_id", PLANT_ID)]
+    sql = f"""
+        WITH active_locs AS (
+            SELECT DISTINCT ip.FUNCTIONAL_LOCATION AS func_loc_id
+            FROM {LOT_TBL} lot
+            JOIN {POINT_TBL} ip
+                ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
+            WHERE lot.PLANT_ID          = :plant_id
+              AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
+              AND ip.FUNCTIONAL_LOCATION IS NOT NULL
+        )
+        SELECT al.func_loc_id
+        FROM active_locs al
+        LEFT JOIN {COORD_TBL} c
+            ON al.func_loc_id = c.func_loc_id
+        WHERE c.func_loc_id IS NULL
+        ORDER BY al.func_loc_id
+    """
+    rows = await run_sql_async(token, sql, params)
+
+    hierarchy = {}
+    for r in rows:
+        flid = r["func_loc_id"]
+        parts = flid.split("-")
+        if len(parts) < 4: continue
+
+        l1, l2, l3, l4 = parts[0], parts[1], parts[2], parts[3]
+
+        if l1 not in hierarchy: hierarchy[l1] = {}
+        if l2 not in hierarchy[l1]: hierarchy[l1][l2] = {}
+        if l3 not in hierarchy[l1][l2]: hierarchy[l1][l2][l3] = {}
+        if l4 not in hierarchy[l1][l2][l3]: hierarchy[l1][l2][l3][l4] = []
+
+        hierarchy[l1][l2][l3][l4].append(flid)
+
+    return hierarchy
+
+
+@router.get("/locations/{func_loc_id}/summary", response_model=LocationSummary)
+async def get_location_summary(
+    func_loc_id: str,
+    x_forwarded_access_token: Optional[str] = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """
+    Returns an aggregated summary for a functional location including
+    metadata, available MICs, and recent inspection lots.
+    """
+    token = resolve_token(x_forwarded_access_token, authorization)
+
+    # 1. Fetch metadata
+    meta_params = [sql_param("func_loc_id", func_loc_id)]
+    meta_sql = f"SELECT * FROM {COORD_TBL} WHERE func_loc_id = :func_loc_id"
+    meta_rows = await run_sql_async(token, meta_sql, meta_params)
+    meta = None
+    if meta_rows:
+        r = meta_rows[0]
+        meta = LocationMeta(
+            func_loc_id=r["func_loc_id"],
+            plant_id=PLANT_ID,
+            floor_id=r["floor_id"],
+            x_pos=float(r["x_pos"]),
+            y_pos=float(r["y_pos"]),
+            is_mapped=True,
+        )
+    else:
+        meta = LocationMeta(
+            func_loc_id=func_loc_id,
+            plant_id=PLANT_ID,
+            is_mapped=False,
+        )
+
+    # 2. Fetch MICs
+    mic_params = [sql_param("func_loc_id", func_loc_id), sql_param("plant_id", PLANT_ID)]
+    mic_sql = f"""
+        SELECT DISTINCT UPPER(TRIM(r.MIC_NAME)) AS mic_name
+        FROM {LOT_TBL} lot
+        JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
+        JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+        WHERE lot.PLANT_ID = :plant_id AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+    """
+    mic_rows = await run_sql_async(token, mic_sql, mic_params)
+    mics = [r["mic_name"] for r in mic_rows if r.get("mic_name")]
+
+    # 3. Fetch recent lots (last 5)
+    from backend.routers.lots import _lot_status
+    lot_sql = f"""
+        SELECT
+            lot.INSPECTION_LOT_ID                       AS lot_id,
+            ip.FUNCTIONAL_LOCATION                      AS func_loc_id,
+            lot.CREATED_DATE                            AS inspection_start_date,
+            lot.INSPECTION_END_DATE                     AS inspection_end_date,
+            MAX(CASE r.INSPECTION_RESULT_VALUATION WHEN 'R' THEN 'R' WHEN 'W' THEN 'W' WHEN 'A' THEN 'A' ELSE NULL END) AS valuation
+        FROM {LOT_TBL} lot
+        JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
+        LEFT JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+        WHERE lot.PLANT_ID = :plant_id AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+        GROUP BY 1, 2, 3, 4 ORDER BY 3 DESC LIMIT 5
+    """
+    lot_rows = await run_sql_async(token, lot_sql, mic_params)
+    recent_lots = [
+        {
+            "lot_id": r["lot_id"],
+            "func_loc_id": r["func_loc_id"],
+            "inspection_start_date": str(r["inspection_start_date"])[:10] if r.get("inspection_start_date") else None,
+            "inspection_end_date": str(r["inspection_end_date"])[:10] if r.get("inspection_end_date") else None,
+            "valuation": r["valuation"],
+            "status": _lot_status(r["valuation"], r.get("inspection_end_date")),
+        }
+        for r in lot_rows
+    ]
+
+    return LocationSummary(meta=meta, mics=mics, recent_lots=recent_lots)
 
 
 @router.delete("/coordinates/{func_loc_id}", status_code=204)

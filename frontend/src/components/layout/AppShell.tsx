@@ -11,7 +11,7 @@ import {
   SkipToContent,
   Content,
 } from '@carbon/react';
-import { Settings, Map } from '@carbon/icons-react';
+import { Settings, Map, Sun, Moon } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
 import { useFloors } from '~/api/client';
 import FilterBar from '~/components/controls/FilterBar';
@@ -20,7 +20,11 @@ import LocationPanel from '~/components/sidepanel/LocationPanel';
 import CoordinateMapper from '~/components/admin/CoordinateMapper';
 
 export default function AppShell() {
-  const { activeFloor, setActiveFloor, selectedLocId, adminMode, setAdminMode } = useEM();
+  const {
+    activeFloor, setActiveFloor, selectedLocId,
+    adminMode, setAdminMode,
+    theme, setTheme,
+  } = useEM();
   const { data: floors = [] } = useFloors();
   const [isSideNavExpanded, setIsSideNavExpanded] = useState(true);
 
@@ -34,7 +38,7 @@ export default function AppShell() {
 
   return (
     <div
-      className="em-app"
+      className={`em-app ${theme === 'g100' ? 'cds--g100' : ''}`}
       style={{
         '--shell-header-height': 'var(--cds-spacing-09, 3rem)',
         '--admin-banner-height': 'var(--cds-spacing-07, 2rem)',
@@ -53,6 +57,13 @@ export default function AppShell() {
         )}
         <HeaderName prefix="Kerry">Environmental Monitoring</HeaderName>
         <HeaderGlobalBar>
+          <HeaderGlobalAction
+            aria-label={theme === 'g100' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={() => setTheme(theme === 'g100' ? 'white' : 'g100')}
+            tooltipAlignment="end"
+          >
+            {theme === 'g100' ? <Sun size={20} /> : <Moon size={20} />}
+          </HeaderGlobalAction>
           <HeaderGlobalAction
             aria-label={adminMode ? 'Exit admin mode' : 'Admin: coordinate mapping'}
             isActive={adminMode}
