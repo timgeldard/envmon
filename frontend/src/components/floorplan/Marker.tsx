@@ -43,14 +43,23 @@ export default function Marker({
     glowOpacity = Math.min(clamped / 5, 0.6);
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(marker);
+    }
+  };
+
   return (
     <g
       className="em-marker-group"
       onClick={() => onClick(marker)}
       onMouseEnter={(e) => onMouseEnter(marker, e)}
       onMouseLeave={onMouseLeave}
+      onKeyDown={handleKeyDown}
       role="button"
-      aria-label={`Location ${marker.func_loc_id}: ${marker.status}`}
+      tabIndex={0}
+      aria-label={`Location ${marker.func_loc_id}: ${marker.status}${marker.risk_score !== null ? `, Risk score: ${marker.risk_score.toFixed(2)}` : ''}`}
     >
       {/* Glow halo for continuous mode */}
       {mode === 'continuous' && glowOpacity > 0 && (

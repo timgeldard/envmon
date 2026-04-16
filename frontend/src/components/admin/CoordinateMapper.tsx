@@ -44,13 +44,14 @@ const FLOOR_LABELS: Record<string, string> = {
   F3: 'Floor 3',
 };
 
+// SVG dimensions based on source viewBox of floor plans
 const SVG_WIDTH = 1021.6;
 const SVG_HEIGHT = 722.48;
 const MARKER_R = 10;
 const MARKER_COLOURS: Record<string, string> = {
-  F1: '#0f62fe',
-  F2: '#8a3ffc',
-  F3: '#007d79',
+  F1: 'var(--em-marker-f1)',
+  F2: 'var(--em-marker-f2)',
+  F3: 'var(--em-marker-f3)',
 };
 
 type DragSource = { funcLocId: string };
@@ -92,7 +93,10 @@ export default function CoordinateMapper() {
   const { mutate: saveCoordinate, isPending: isSaving } = useSaveCoordinate();
   const { mutate: deleteCoordinate, isPending: isDeleting } = useDeleteCoordinate();
 
-  const floorMapped = mapped.filter((m) => m.floor_id === activeFloor);
+  const floorMapped = useMemo(
+    () => mapped.filter((m) => m.floor_id === activeFloor),
+    [mapped, activeFloor],
+  );
 
   // ---------------------------------------------------------------------------
   // Cascading filter logic
@@ -155,20 +159,23 @@ export default function CoordinateMapper() {
   // Drop handling
   // ---------------------------------------------------------------------------
 
-  const screenToSvgPct = (clientX: number, clientY: number) => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return null;
-    const pt = svgEl.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const ctm = svgEl.getScreenCTM();
-    if (!ctm) return null;
-    const svgPt = pt.matrixTransform(ctm.inverse());
-    return {
-      x_pos: Math.round(Math.max(0, Math.min(100, (svgPt.x / SVG_WIDTH) * 100)) * 100) / 100,
-      y_pos: Math.round(Math.max(0, Math.min(100, (svgPt.y / SVG_HEIGHT) * 100)) * 100) / 100,
-    };
-  };
+  const screenToSvgPct = useCallback(
+    (clientX: number, clientY: number) => {
+      const svgEl = svgRef.current;
+      if (!svgEl) return null;
+      const pt = svgEl.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svgEl.getScreenCTM();
+      if (!ctm) return null;
+      const svgPt = pt.matrixTransform(ctm.inverse());
+      return {
+        x_pos: Math.round(Math.max(0, Math.min(100, (svgPt.x / SVG_WIDTH) * 100)) * 100) / 100,
+        y_pos: Math.round(Math.max(0, Math.min(100, (svgPt.y / SVG_HEIGHT) * 100)) * 100) / 100,
+      };
+    },
+    [],
+  );
 
   const notify = (kind: 'success' | 'error', message: string) => {
     setNotification({ kind, message });
@@ -208,7 +215,7 @@ export default function CoordinateMapper() {
     });
   };
 
-  const markerColour = MARKER_COLOURS[activeFloor] ?? '#0f62fe';
+  const markerColour = MARKER_COLOURS[activeFloor] ?? 'var(--em-marker-f1)';
 
   return (
     <div className="em-mapper-container">
@@ -294,7 +301,7 @@ export default function CoordinateMapper() {
               {loadingUnmapped && <Loading description="Loading…" withOverlay={false} small />}
 
               {!loadingUnmapped && filteredUnmapped.length === 0 && (
-                <p style={{ color: '#6f6f6f', fontSize: '0.8rem' }}>
+                <p style={{ color: 'var(--cds-text-secondary)', fontSize: 'var(--cds-label-01-font-size)' }}>
                   {unmapped.length === 0
                     ? 'All locations are mapped.'
                     : searchQuery
@@ -323,7 +330,7 @@ export default function CoordinateMapper() {
               {loadingMapped && <Loading description="Loading…" withOverlay={false} small />}
 
               {!loadingMapped && filteredMapped.length === 0 && (
-                <p style={{ color: '#6f6f6f', fontSize: '0.8rem', marginTop: '0.75rem' }}>
+                <p style={{ color: 'var(--cds-text-secondary)', fontSize: 'var(--cds-label-01-font-size)', marginTop: 'var(--cds-spacing-04)' }}>
                   {mapped.length === 0
                     ? 'No locations mapped yet.'
                     : 'No mapped locations match the search.'}
@@ -393,12 +400,12 @@ export default function CoordinateMapper() {
           alt={`Floor ${activeFloor} plan`}
           style={{
             position: 'absolute',
-            top: '2.5rem',
+            top: 'var(--cds-spacing-09)',
             left: 0,
             right: 0,
             bottom: 0,
             width: '100%',
-            height: 'calc(100% - 2.5rem)',
+            height: 'calc(100% - var(--cds-spacing-09))',
             objectFit: 'contain',
             objectPosition: 'center',
             display: 'block',
@@ -413,12 +420,12 @@ export default function CoordinateMapper() {
           preserveAspectRatio="xMidYMid meet"
           style={{
             position: 'absolute',
-            top: '2.5rem',
+            top: 'var(--cds-spacing-09)',
             left: 0,
             right: 0,
             bottom: 0,
             width: '100%',
-            height: 'calc(100% - 2.5rem)',
+            height: 'calc(100% - var(--cds-spacing-09))',
             cursor: dragging ? 'crosshair' : 'default',
             overflow: 'visible',
           }}
@@ -438,7 +445,7 @@ export default function CoordinateMapper() {
                 onDragEnd={() => setDragging(null)}
               >
                 <circle cx={cx} cy={cy} r={MARKER_R + 4} fill={markerColour} opacity={0.15} />
-                <circle cx={cx} cy={cy} r={MARKER_R} fill={markerColour} stroke="#ffffff" strokeWidth={1.5} />
+                <circle cx={cx} cy={cy} r={MARKER_R} fill={markerColour} stroke="var(--cds-background)" strokeWidth={1.5} />
                 <text
                   x={cx}
                   y={cy - MARKER_R - 4}
@@ -457,8 +464,10 @@ export default function CoordinateMapper() {
           {dragging && (
             <rect
               x={0} y={0} width={SVG_WIDTH} height={SVG_HEIGHT}
-              fill="rgba(15,98,254,0.04)"
-              stroke="#0f62fe" strokeWidth={8} strokeDasharray="24 12"
+              fill="var(--cds-interactive-01)"
+              opacity={0.05}
+              stroke="var(--cds-interactive-01)"
+              strokeWidth={8} strokeDasharray="24 12"
               pointerEvents="none"
             />
           )}
@@ -475,7 +484,13 @@ export default function CoordinateMapper() {
         )}
 
         {notification && (
-          <div style={{ position: 'absolute', top: '3.5rem', left: '1rem', right: '1rem', zIndex: 20 }}>
+          <div style={{
+            position: 'absolute',
+            top: 'calc(var(--cds-spacing-09) + var(--cds-spacing-04))',
+            left: 'var(--cds-spacing-05)',
+            right: 'var(--cds-spacing-05)',
+            zIndex: 20,
+          }}>
             <InlineNotification
               kind={notification.kind}
               title={notification.kind === 'success' ? 'Saved' : 'Error'}
@@ -487,7 +502,7 @@ export default function CoordinateMapper() {
 
         {dragging && (
           <div style={{
-            position: 'absolute', bottom: '1rem', left: '50%',
+            position: 'absolute', bottom: 'var(--cds-spacing-05)', left: '50%',
             transform: 'translateX(-50%)',
             pointerEvents: 'none', zIndex: 20,
           }}>

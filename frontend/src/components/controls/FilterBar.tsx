@@ -1,4 +1,4 @@
-import { Select, SelectItem, Toggle } from '@carbon/react';
+import { Select, SelectItem, Toggle, Layer, Slider } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import type { TimeWindow } from '~/types';
 
@@ -11,33 +11,63 @@ const TIME_WINDOWS: { value: TimeWindow; label: string }[] = [
 ];
 
 export default function FilterBar() {
-  const { timeWindow, setTimeWindow, heatmapMode, setHeatmapMode } = useEM();
+  const {
+    timeWindow, setTimeWindow,
+    heatmapMode, setHeatmapMode,
+    historicalDate, setHistoricalDate,
+  } = useEM();
+
+  const handleSliderChange = ({ value }: { value: number }) => {
+    if (value === 0) {
+      setHistoricalDate(null);
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() - value);
+      setHistoricalDate(d.toISOString().split('T')[0]);
+    }
+  };
 
   return (
-    <div className="em-filter-bar">
-      <Select
-        id="em-time-window"
-        labelText="Time window"
-        size="sm"
-        value={String(timeWindow)}
-        onChange={(e) => setTimeWindow(Number(e.target.value) as TimeWindow)}
-      >
-        {TIME_WINDOWS.map(({ value, label }) => (
-          <SelectItem key={value} value={String(value)} text={label} />
-        ))}
-      </Select>
+    <div className="em-filter-bar" role="region" aria-label="Heatmap filters">
+      <Layer style={{ display: 'flex', alignItems: 'center', gap: 'var(--cds-spacing-05)', flex: 1 }}>
+        <Select
+          id="em-time-window"
+          labelText="Time window"
+          size="sm"
+          inline
+          value={String(timeWindow)}
+          onChange={(e) => setTimeWindow(Number(e.target.value) as TimeWindow)}
+        >
+          {TIME_WINDOWS.map(({ value, label }) => (
+            <SelectItem key={value} value={String(value)} text={label} />
+          ))}
+        </Select>
 
-      <Toggle
-        id="em-heatmap-mode"
-        labelText="Heatmap mode"
-        labelA="Worst-case"
-        labelB="Risk density"
-        toggled={heatmapMode === 'continuous'}
-        onToggle={(checked: boolean) =>
-          setHeatmapMode(checked ? 'continuous' : 'deterministic')
-        }
-        size="sm"
-      />
+        <Toggle
+          id="em-heatmap-mode"
+          labelText="Heatmap mode"
+          labelA="Deterministic"
+          labelB="Continuous"
+          toggled={heatmapMode === 'continuous'}
+          onToggle={(checked: boolean) =>
+            setHeatmapMode(checked ? 'continuous' : 'deterministic')
+          }
+          size="sm"
+        />
+
+        <div style={{ flex: 1, maxWidth: '24rem', marginLeft: 'var(--cds-spacing-07)' }}>
+          <Slider
+            id="time-travel-scrub"
+            labelText={historicalDate ? `Viewing: ${historicalDate}` : 'Scrub history (Today)'}
+            max={timeWindow}
+            min={0}
+            step={1}
+            value={historicalDate ? Math.floor((new Date().getTime() - new Date(historicalDate).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+            onChange={handleSliderChange}
+            hideTextInput
+          />
+        </div>
+      </Layer>
     </div>
   );
 }

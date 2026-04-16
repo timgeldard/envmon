@@ -17,7 +17,9 @@ import {
   StructuredListCell,
   StructuredListBody,
   Tag,
-  Loading,
+  DataTableSkeleton,
+  SkeletonText,
+  Layer,
 } from '@carbon/react';
 import { useLots, useLotDetail } from '~/api/client';
 import { useEM } from '~/context/EMContext';
@@ -47,7 +49,7 @@ function LotRow({ lot }: { lot: InspectionLot }) {
   return (
     <>
       <TableRow
-        style={{ cursor: 'pointer' }}
+        className="em-clickable-row"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
@@ -62,47 +64,47 @@ function LotRow({ lot }: { lot: InspectionLot }) {
 
       {expanded && (
         <TableRow>
-          <TableCell
-            colSpan={3}
-            style={{
-              background: 'var(--cds-layer-01)',
-              padding: 'var(--cds-spacing-03) var(--cds-spacing-05)',
-            }}
-          >
-            {isLoading && (
-              <Loading description="Loading MIC results…" withOverlay={false} small />
-            )}
-            {detail && detail.mic_results.length === 0 && (
-              <p className="cds--label" style={{ color: 'var(--cds-text-secondary)' }}>
-                No MIC results.
-              </p>
-            )}
-            {detail && detail.mic_results.length > 0 && (
-              <StructuredListWrapper isCondensed aria-label="MIC results">
-                <StructuredListHead>
-                  <StructuredListRow head>
-                    <StructuredListCell head>MIC</StructuredListCell>
-                    <StructuredListCell head>Result</StructuredListCell>
-                    <StructuredListCell head>Limit</StructuredListCell>
-                    <StructuredListCell head>Val.</StructuredListCell>
-                  </StructuredListRow>
-                </StructuredListHead>
-                <StructuredListBody>
-                  {detail.mic_results.map((mic) => (
-                    <StructuredListRow key={mic.mic_id}>
-                      <StructuredListCell>{mic.mic_name}</StructuredListCell>
-                      <StructuredListCell noWrap>{mic.result_value ?? '—'}</StructuredListCell>
-                      <StructuredListCell noWrap>{mic.upper_limit ?? '—'}</StructuredListCell>
-                      <StructuredListCell>
-                        <Tag type={MIC_VALUATION_KIND[mic.valuation ?? ''] ?? 'gray'} size="sm">
-                          {mic.valuation ?? '?'}
-                        </Tag>
-                      </StructuredListCell>
-                    </StructuredListRow>
-                  ))}
-                </StructuredListBody>
-              </StructuredListWrapper>
-            )}
+          <TableCell colSpan={3} className="em-expanded-row-cell">
+            <Layer>
+              <div className="em-expanded-row-content">
+                {isLoading && (
+                  <div style={{ padding: 'var(--cds-spacing-03) 0' }}>
+                    <SkeletonText paragraph lineCount={3} />
+                  </div>
+                )}
+                {detail && detail.mic_results.length === 0 && (
+                  <p className="cds--label em-side-panel__label">
+                    No MIC results.
+                  </p>
+                )}
+                {detail && detail.mic_results.length > 0 && (
+                  <StructuredListWrapper isCondensed aria-label="MIC results">
+                    <StructuredListHead>
+                      <StructuredListRow head>
+                        <StructuredListCell head>MIC</StructuredListCell>
+                        <StructuredListCell head>Result</StructuredListCell>
+                        <StructuredListCell head>Limit</StructuredListCell>
+                        <StructuredListCell head>Val.</StructuredListCell>
+                      </StructuredListRow>
+                    </StructuredListHead>
+                    <StructuredListBody>
+                      {detail.mic_results.map((mic) => (
+                        <StructuredListRow key={mic.mic_id}>
+                          <StructuredListCell>{mic.mic_name}</StructuredListCell>
+                          <StructuredListCell noWrap>{mic.result_value ?? '—'}</StructuredListCell>
+                          <StructuredListCell noWrap>{mic.upper_limit ?? '—'}</StructuredListCell>
+                          <StructuredListCell>
+                            <Tag type={MIC_VALUATION_KIND[mic.valuation ?? ''] ?? 'gray'} size="sm">
+                              {mic.valuation ?? '?'}
+                            </Tag>
+                          </StructuredListCell>
+                        </StructuredListRow>
+                      ))}
+                    </StructuredListBody>
+                  </StructuredListWrapper>
+                )}
+              </div>
+            </Layer>
           </TableCell>
         </TableRow>
       )}
@@ -116,18 +118,24 @@ export default function LotsTab({ funcLocId }: LotsTabProps) {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 'var(--cds-spacing-05)' }}>
-        <Loading description="Loading lots…" withOverlay={false} small />
+      <div className="em-tab-content" style={{ paddingTop: 0 }}>
+        <DataTableSkeleton
+          columnCount={3}
+          rowCount={5}
+          headers={[
+            { key: 'id', header: 'Lot ID' },
+            { key: 'date', header: 'Start date' },
+            { key: 'status', header: 'Status' },
+          ]}
+          size="sm"
+        />
       </div>
     );
   }
 
   if (lots.length === 0) {
     return (
-      <p
-        className="cds--body-short-01"
-        style={{ padding: 'var(--cds-spacing-05)', color: 'var(--cds-text-secondary)' }}
-      >
+      <p className="cds--body-short-01 em-tab-content em-secondary-text">
         No inspection lots in this time window.
       </p>
     );

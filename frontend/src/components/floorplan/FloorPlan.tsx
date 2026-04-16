@@ -40,7 +40,7 @@ const SVG_WIDTH = 1021.6;
 const SVG_HEIGHT = 722.48;
 
 export default function FloorPlan() {
-  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId } = useEM();
+  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme } = useEM();
 
   const [tooltip, setTooltip] = useState<{
     marker: MarkerData;
@@ -52,6 +52,7 @@ export default function FloorPlan() {
     activeFloor,
     heatmapMode,
     timeWindow,
+    historicalDate,
   );
 
   const handleMarkerClick = useCallback(
@@ -76,14 +77,15 @@ export default function FloorPlan() {
         <div style={{
           position: 'absolute', inset: 0, zIndex: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: theme === 'g100' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)',
         }}>
-          <Loading description="Loading heatmap…" withOverlay={false} />
+          <Loading description="Loading heatmap..." withOverlay={false} />
         </div>
       )}
 
       {/* Error banner */}
       {isError && (
-        <div style={{ position: 'absolute', top: '1rem', left: '1rem', right: '1rem', zIndex: 10 }}>
+        <div style={{ position: 'absolute', top: 'var(--cds-spacing-05)', left: 'var(--cds-spacing-05)', right: 'var(--cds-spacing-05)', zIndex: 10 }}>
           <InlineNotification
             kind="error"
             title="Failed to load heatmap"
@@ -102,7 +104,8 @@ export default function FloorPlan() {
       <img
         key={svgUrl}
         src={svgUrl}
-        alt={`Floor ${activeFloor} plan`}
+        alt={`Floor plan for ${activeFloor}`}
+        role="img"
         style={{
           position: 'absolute',
           inset: 0,

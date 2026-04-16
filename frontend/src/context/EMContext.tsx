@@ -18,6 +18,9 @@ interface EMState {
   heatmapMode: HeatmapMode;
   selectedLocId: string | null;
   adminMode: boolean;
+  sidePanelExpanded: boolean;
+  theme: 'white' | 'g100';
+  historicalDate: string | null;
 }
 
 interface EMActions {
@@ -26,6 +29,9 @@ interface EMActions {
   setHeatmapMode: (mode: HeatmapMode) => void;
   setSelectedLocId: (id: string | null) => void;
   setAdminMode: (on: boolean) => void;
+  setSidePanelExpanded: (on: boolean) => void;
+  setTheme: (theme: 'white' | 'g100') => void;
+  setHistoricalDate: (date: string | null) => void;
 }
 
 const EMContext = createContext<(EMState & EMActions) | null>(null);
@@ -50,6 +56,11 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
   );
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const [adminMode, setAdminMode] = useState(false);
+  const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
+  const [theme, setThemeRaw] = useState<'white' | 'g100'>(
+    () => (readSearchParam<string>('theme', 'white', ['white', 'g100']) as 'white' | 'g100') ?? 'white',
+  );
+  const [historicalDate, setHistoricalDateRaw] = useState<string | null>(null);
 
   const pushParam = useCallback((key: string, value: string) => {
     const sp = new URLSearchParams(window.location.search);
@@ -82,6 +93,18 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
     [pushParam],
   );
 
+  const setTheme = useCallback(
+    (newTheme: 'white' | 'g100') => {
+      setThemeRaw(newTheme);
+      pushParam('theme', newTheme);
+    },
+    [pushParam],
+  );
+
+  const setHistoricalDate = useCallback((date: string | null) => {
+    setHistoricalDateRaw(date);
+  }, []);
+
   const value = useMemo(
     () => ({
       activeFloor,
@@ -89,15 +112,21 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
       heatmapMode,
       selectedLocId,
       adminMode,
+      sidePanelExpanded,
+      theme,
+      historicalDate,
       setActiveFloor,
       setTimeWindow,
       setHeatmapMode,
       setSelectedLocId,
       setAdminMode,
+      setSidePanelExpanded,
+      setTheme,
+      setHistoricalDate,
     }),
     [
-      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode,
-      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId,
+      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode, sidePanelExpanded, theme, historicalDate,
+      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId, setAdminMode, setSidePanelExpanded, setTheme, setHistoricalDate,
     ],
   );
 
