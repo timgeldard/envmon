@@ -3,10 +3,17 @@ import {
   Select, SelectItem, Toggle, Layer, Slider,
   IconButton, MultiSelect
 } from '@carbon/react';
-import { Play, Pause } from '@carbon/icons-react';
+import { Play, Pause, Download } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
-import { useMics } from '~/api/client';
+import { useMics, useHeatmap } from '~/api/client';
 import type { TimeWindow } from '~/types';
+
+function escapeCsv(val: unknown): string {
+  if (val === null || val === undefined) return '""';
+  let s = String(val);
+  if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+}
 
 const TIME_WINDOWS: { value: TimeWindow; label: string }[] = [
   { value: 30,  label: 'Last 30 days' },
@@ -27,6 +34,7 @@ function computeDaysSinceToday(ymd: string): number {
 
 export default function FilterBar() {
   const {
+    activeFloor,
     timeWindow, setTimeWindow,
     heatmapMode, setHeatmapMode,
     historicalDate, setHistoricalDate,
@@ -35,6 +43,22 @@ export default function FilterBar() {
   } = useEM();
 
   const { data: allMics = [] } = useMics();
+  const { data: heatmapData } = useHeatmap(activeFloor, heatmapMode, timeWindow, historicalDate, decayLambda, selectedMics);
+
+  const handleExport = () => {
+    const markers = heatmapData?.markers;
+    if (!markers?.length) return;
+    const headers = ['Functional Location', 'Status', 'Risk Score', 'Fail Count', 'Total Lots', 'X%', 'Y%'];
+    const rows = markers.map((m) => [m.func_loc_id, m.status, m.risk_score ?? '', m.fail_count, m.total_count, m.x_pos.toFixed(2), m.y_pos.toFixed(2)]);
+    const csv = [headers, ...rows].map((r) => r.map(escapeCsv).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `em_heatmap_${activeFloor}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
+  };
   const [isPlaying, setIsPlaying] = useState(false);
   const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -169,6 +193,17 @@ export default function FilterBar() {
             hideTextInput
           />
         </div>
+
+        <IconButton
+          label="Export markers to CSV"
+          kind="ghost"
+          size="sm"
+          align="bottom"
+          onClick={handleExport}
+          disabled={!heatmapData?.markers?.length}
+        >
+          <Download size={16} />
+        </IconButton>
       </Layer>
     </div>
   );

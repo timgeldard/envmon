@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { MarkerData, HeatmapMode } from '~/types';
 
 interface MarkerProps {
@@ -23,7 +23,7 @@ const STATUS_CLASS: Record<string, string> = {
 const BASE_RADIUS = 10;
 const MAX_GLOW_RADIUS = 22;
 
-export default function Marker({
+export default memo(function Marker({
   marker,
   mode,
   svgWidth,
@@ -65,6 +65,9 @@ export default function Marker({
       tabIndex={0}
       aria-label={`Location ${marker.func_loc_id}: ${marker.status}${marker.risk_score !== null ? `, Risk score: ${marker.risk_score.toFixed(2)}` : ''}`}
     >
+      {/* Transparent hit area — prevents flicker from gaps between child elements */}
+      <circle cx={cx} cy={cy} r={radius + 8} fill="transparent" />
+
       {/* Blast Radius visualization for failed points */}
       {marker.status === 'FAIL' && (
         <circle
@@ -113,4 +116,4 @@ export default function Marker({
       )}
     </g>
   );
-}
+});

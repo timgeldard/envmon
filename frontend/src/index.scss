@@ -51,13 +51,13 @@
   background: var(--cds-layer-01);
 }
 
-/* Side panel */
+/* Side panel — sits below the header AND the filter bar */
 .em-side-panel {
   position: fixed;
-  top: var(--shell-header-height);
+  top: calc(var(--shell-header-height) + var(--cds-spacing-09));
   right: 0;
   width: 20rem; /* Carbon standard side panel width (~320px) */
-  height: calc(100% - var(--shell-header-height));
+  height: calc(100% - var(--shell-header-height) - var(--cds-spacing-09));
   background: var(--cds-layer-01);
   border-left: 1px solid var(--cds-border-subtle-01);
   overflow-y: auto;
@@ -140,6 +140,11 @@
 .em-marker-group {
   cursor: pointer;
   outline: none;
+  /* Scale from the marker's own centre, not the SVG canvas origin.
+     Without these two properties the <g> jumps away from the cursor
+     on hover, triggering mouseLeave → scale resets → mouseEnter → flicker. */
+  transform-box: fill-box;
+  transform-origin: center;
   transition: transform 110ms var(--cds-motion-easing-standard, ease);
 
   &:hover {
@@ -157,6 +162,31 @@
 .em-marker-label {
   pointer-events: none;
   user-select: none;
+}
+
+/* Main content area — flex column so FilterBar + content body stack correctly */
+.em-main-content {
+  display: flex !important;
+  flex-direction: column;
+  padding: 0 !important;
+  height: calc(100vh - var(--shell-header-height));
+  overflow: hidden;
+}
+
+/* In admin mode the fixed banner (2rem) sits on top of the content area,
+   obscuring the top of the mapper canvas. Shift content down and shrink
+   height to keep everything within the viewport. */
+.em-main-content[data-admin-mode="true"] {
+  padding-top: var(--admin-banner-height) !important;
+  height: calc(100vh - var(--shell-header-height) - var(--admin-banner-height)) !important;
+}
+
+/* Content body — positioning context for the absolutely-placed floor plan */
+.em-content-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ---------------------------------------------------------------------------
@@ -275,6 +305,12 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--cds-spacing-04);
   margin-bottom: var(--cds-spacing-06);
+
+  // Carbon wraps each Select in .cds--form-item which adds bottom margin;
+  // zero it out so the grid items don't overflow into the count below.
+  .cds--form-item {
+    margin-bottom: 0;
+  }
 }
 
 .em-mapper-search {
@@ -347,6 +383,13 @@
   background: var(--cds-layer-01);
   border-bottom: 1px solid var(--cds-border-subtle-01);
   z-index: 50;
+  overflow: hidden;
+
+  // Carbon's form item adds bottom margin that overflows the fixed-height bar
+  .cds--form-item {
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
 }
 
 .em-mapper-floor-count {

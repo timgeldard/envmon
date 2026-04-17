@@ -52,8 +52,8 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
   );
   const [timeWindow, setTimeWindowRaw] = useState<TimeWindow>(
     () =>
-      readSearchParam<string>('tw', '90', ['30', '60', '90', '180', '365']) as unknown as TimeWindow
-      ?? 90,
+      readSearchParam<string>('tw', '365', ['30', '60', '90', '180', '365']) as unknown as TimeWindow
+      ?? 365,
   );
   const [heatmapMode, setHeatmapModeRaw] = useState<HeatmapMode>(
     () => readSearchParam<HeatmapMode>('mode', 'deterministic', ['deterministic', 'continuous']),

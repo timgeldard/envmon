@@ -91,12 +91,21 @@ def _check_spc_warning(rows: list[dict]) -> bool:
             continue
 
         last_3 = sorted_group[-3:]
-        v1, v2, v3 = last_3[0]["result_value"], last_3[1]["result_value"], last_3[2]["result_value"]
+        try:
+            v1 = float(last_3[0]["result_value"])
+            v2 = float(last_3[1]["result_value"])
+            v3 = float(last_3[2]["result_value"])
+        except (TypeError, ValueError):
+            continue
 
         # Strictly increasing?
         if v3 > v2 > v1:
             # approaching upper limit? (if limit exists)
-            limit = last_3[2].get("upper_limit")
+            raw_limit = last_3[2].get("upper_limit")
+            try:
+                limit = float(raw_limit) if raw_limit is not None else None
+            except (TypeError, ValueError):
+                limit = None
             if limit is not None and limit > 0:
                 if v3 >= (limit * 0.5): # flag if > 50% of limit
                     return True
@@ -116,7 +125,7 @@ def _check_spc_warning(rows: list[dict]) -> bool:
 async def get_heatmap(
     floor_id: str,
     mode: Literal["deterministic", "continuous"] = Query("deterministic"),
-    time_window_days: int = Query(90, ge=1, le=365),
+    time_window_days: int = Query(365, ge=1, le=365),
     decay_lambda: Optional[float] = Query(None, ge=0.0, le=1.0),
     mics: Optional[list[str]] = Query(None),
     as_of_date: Optional[date] = Query(None),

@@ -1,7 +1,6 @@
-# Databricks Apps configuration
-# Generated from app.template.yaml by `make render-app-config`.
-# This file contains UAT defaults and is safe to commit.
-# auth_type and requested_scopes are configured via the App Settings UI.
+# Databricks Apps configuration — generated from app.template.yaml by `make render-app-config`
+# Do not edit app.yaml directly; edit this template instead.
+# auth_type and requested_scopes are configured via the App Settings UI (User authorization).
 command:
   - uvicorn
   - backend.main:app

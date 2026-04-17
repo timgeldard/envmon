@@ -14,8 +14,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Loading, InlineNotification, IconButton } from '@carbon/react';
-import { Download } from '@carbon/icons-react';
+import { Loading, InlineNotification } from '@carbon/react';
 import { useEM } from '~/context/EMContext';
 import { useHeatmap, useFloors } from '~/api/client';
 import Marker from './Marker';
@@ -25,16 +24,6 @@ import type { MarkerData } from '~/types';
 // Default aspect ratio if not provided by backend
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
-
-/** Escape and quote a value for CSV */
-function escapeCsv(val: any): string {
-  if (val === null || val === undefined) return '""';
-  let s = String(val);
-  // Guard against CSV injection
-  if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
-  // Escape double quotes
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 export default function FloorPlan() {
   const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme, decayLambda, selectedMics } = useEM();
@@ -73,61 +62,12 @@ export default function FloorPlan() {
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  const handleExport = () => {
-    if (!data?.markers.length) return;
-    const headers = ['Functional Location', 'Status', 'Risk Score', 'Fail Count', 'Total Lots', 'X%', 'Y%'];
-    const rows = data.markers.map((m) => [
-      m.func_loc_id,
-      m.status,
-      m.risk_score ?? '',
-      m.fail_count,
-      m.total_count,
-      m.x_pos.toFixed(2),
-      m.y_pos.toFixed(2),
-    ]);
-    
-    const csvContent = [headers, ...rows]
-      .map((r) => r.map(escapeCsv).join(','))
-      .join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `em_heatmap_${activeFloor}_${new Date().toISOString().split('T')[0]}.csv`);
-    
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-    }, 100);
-  };
-
   const svgUrl = currentFloor?.svg_url;
   const viewWidth = currentFloor?.svg_width || DEFAULT_WIDTH;
   const viewHeight = currentFloor?.svg_height || DEFAULT_HEIGHT;
 
   return (
     <div className="em-floorplan-container">
-      {/* Action bar */}
-      <div style={{
-        position: 'absolute', top: 'var(--cds-spacing-05)', right: 'var(--cds-spacing-05)',
-        zIndex: 20, display: 'flex', gap: 'var(--cds-spacing-03)',
-      }}>
-        <IconButton
-          label="Export markers to CSV"
-          kind="ghost"
-          size="md"
-          align="bottom-left"
-          onClick={handleExport}
-          disabled={!data?.markers.length}
-        >
-          <Download size={20} />
-        </IconButton>
-      </div>
 
       {/* Loading spinner */}
       {isLoading && (
