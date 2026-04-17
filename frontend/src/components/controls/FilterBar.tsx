@@ -25,6 +25,7 @@ export default function FilterBar() {
     timeWindow, setTimeWindow,
     heatmapMode, setHeatmapMode,
     historicalDate, setHistoricalDate,
+    decayLambda, setDecayLambda,
   } = useEM();
 
   // Clamp or clear historicalDate when timeWindow shrinks
@@ -81,6 +82,21 @@ export default function FilterBar() {
           }
           size="sm"
         />
+
+        {heatmapMode === 'continuous' && (
+          <div style={{ flex: 1, maxWidth: '16rem', marginLeft: 'var(--cds-spacing-05)' }}>
+            <Slider
+              id="risk-sensitivity"
+              labelText={`Risk sensitivity (Half-life: ${Math.round(Math.log(2) / decayLambda)}d)`}
+              max={0.5}
+              min={0.01}
+              step={0.01}
+              value={decayLambda}
+              onChange={({ value }) => setDecayLambda(value)}
+              hideTextInput
+            />
+          </div>
+        )}
 
         <div style={{ flex: 1, maxWidth: '24rem', marginLeft: 'var(--cds-spacing-07)' }}>
           <Slider

@@ -27,7 +27,7 @@ const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
 
 export default function FloorPlan() {
-  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme } = useEM();
+  const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme, decayLambda } = useEM();
   const { data: floors = [] } = useFloors();
 
   const currentFloor = useMemo(
@@ -46,6 +46,7 @@ export default function FloorPlan() {
     heatmapMode,
     timeWindow,
     historicalDate,
+    decayLambda,
   );
 
   const handleMarkerClick = useCallback(

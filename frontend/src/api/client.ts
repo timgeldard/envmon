@@ -63,6 +63,7 @@ export function useHeatmap(
   mode: HeatmapMode,
   timeWindowDays: number,
   asOfDate?: string | null,
+  decayLambda?: number,
 ) {
   const params = new URLSearchParams({
     floor_id: floorId,
@@ -70,9 +71,10 @@ export function useHeatmap(
     time_window_days: String(timeWindowDays),
   });
   if (asOfDate) params.set('as_of_date', asOfDate);
+  if (decayLambda !== undefined) params.set('decay_lambda', String(decayLambda));
 
   return useQuery<HeatmapResponse>({
-    queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate],
+    queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate, decayLambda],
     queryFn: () => apiFetch(`/api/em/heatmap?${params}`),
     staleTime: 5 * 60_000,
     enabled: Boolean(floorId),
