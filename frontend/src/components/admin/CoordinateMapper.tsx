@@ -10,7 +10,9 @@
  * Canvas:
  *   - Floor dropdown in canvas header
  *   - Background <img key> reloads on floor switch
- *   - SVG overlay: drop target + existing mapped markers (draggable to reposition)
+ *   - SVG overlay: drop target for sidebar drags + pointer-based repositioning of
+ *     existing markers (HTML5 draggable is unreliable on SVG elements).
+ *   - Markers are coloured by their current heatmap status (PASS/FAIL/WARNING/…).
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,20 +29,29 @@ import {
   useSaveCoordinate,
   useDeleteCoordinate,
   useFloors,
+  useHeatmap,
 } from '~/api/client';
 
 const MARKER_R = 10;
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
 
-/** Deterministic marker color based on floor ID */
-function getMarkerColor(floorId: string): string {
-  const id = floorId.toUpperCase();
-  if (id.includes('F1')) return 'var(--em-marker-f1)';
-  if (id.includes('F2')) return 'var(--em-marker-f2)';
-  if (id.includes('F3')) return 'var(--em-marker-f3)';
-  return 'var(--cds-interactive-01)'; // Fallback
-}
+const STATUS_CLASS: Record<string, string> = {
+  PASS:    'em-marker--pass',
+  FAIL:    'em-marker--fail',
+  WARNING: 'em-marker--warning',
+  PENDING: 'em-marker--pending',
+  NO_DATA: 'em-marker--no-data',
+};
+
+// CSS fill vars keyed by status class, for text labels
+const STATUS_FILL: Record<string, string> = {
+  'em-marker--pass':    'var(--cds-support-success)',
+  'em-marker--fail':    'var(--cds-support-error)',
+  'em-marker--warning': 'var(--cds-support-warning)',
+  'em-marker--pending': 'var(--cds-support-info)',
+  'em-marker--no-data': 'var(--cds-text-placeholder)',
+};
 
 type DragSource = { funcLocId: string };
 
@@ -60,7 +71,7 @@ function levelsAt(ids: string[], levelIdx: number): string[] {
 }
 
 export default function CoordinateMapper() {
-  const { activeFloor, setActiveFloor } = useEM();
+  const { activeFloor, setActiveFloor, timeWindow } = useEM();
   const svgRef = useRef<SVGSVGElement>(null);
 
   const { data: floors = [] } = useFloors();
@@ -83,6 +94,14 @@ export default function CoordinateMapper() {
   const viewWidth = currentFloor?.svg_width || DEFAULT_WIDTH;
   const viewHeight = currentFloor?.svg_height || DEFAULT_HEIGHT;
 
+  // Heatmap status for alert colours on mapped markers
+  const { data: heatmapData } = useHeatmap(activeFloor, 'deterministic', timeWindow);
+  const statusMap = useMemo(() => {
+    const m = new Map<string, string>();
+    heatmapData?.markers.forEach((marker) => m.set(marker.func_loc_id, marker.status));
+    return m;
+  }, [heatmapData]);
+
   // Hierarchy filter state (levels 1–4, 0-indexed as 0–3)
   const [l1, setL1] = useState('');
   const [l2, setL2] = useState('');
@@ -90,7 +109,13 @@ export default function CoordinateMapper() {
   const [l4, setL4] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // HTML5 drag source (sidebar items → SVG drop)
   const [dragging, setDragging] = useState<DragSource | null>(null);
+
+  // Pointer-based drag for repositioning existing SVG markers
+  const [pointerDragging, setPointerDragging] = useState<string | null>(null);
+  const [previewPos, setPreviewPos] = useState<{ cx: number; cy: number } | null>(null);
+
   const [notification, setNotification] = useState<{
     kind: 'success' | 'error';
     message: string;
@@ -158,7 +183,7 @@ export default function CoordinateMapper() {
   const handleL3 = (v: string) => { setL3(v); setL4(''); };
 
   // ---------------------------------------------------------------------------
-  // Drop handling
+  // Coordinate helpers
   // ---------------------------------------------------------------------------
 
   const screenToSvgPct = useCallback(
@@ -183,6 +208,10 @@ export default function CoordinateMapper() {
     setNotification({ kind, message });
     setTimeout(() => setNotification(null), 3000);
   };
+
+  // ---------------------------------------------------------------------------
+  // HTML5 drag-and-drop — sidebar items dropped onto SVG canvas
+  // ---------------------------------------------------------------------------
 
   const handleDrop = useCallback(
     (e: React.DragEvent<SVGSVGElement>) => {
@@ -210,6 +239,56 @@ export default function CoordinateMapper() {
     e.dataTransfer.dropEffect = 'move';
   };
 
+  // ---------------------------------------------------------------------------
+  // Pointer-based drag — repositioning existing SVG markers
+  // HTML5 draggable is unreliable on SVG <g> elements; pointer events work
+  // consistently across browsers and touch devices.
+  // ---------------------------------------------------------------------------
+
+  const handleMarkerPointerDown = useCallback(
+    (e: React.PointerEvent<SVGGElement>, funcLocId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setPointerDragging(funcLocId);
+      // Capture so pointermove/pointerup fire even when cursor leaves the element
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    },
+    [],
+  );
+
+  const handleSvgPointerMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!pointerDragging) return;
+      const pos = screenToSvgPct(e.clientX, e.clientY);
+      if (pos) {
+        setPreviewPos({
+          cx: (pos.x_pos / 100) * viewWidth,
+          cy: (pos.y_pos / 100) * viewHeight,
+        });
+      }
+    },
+    [pointerDragging, screenToSvgPct, viewWidth, viewHeight],
+  );
+
+  const handleSvgPointerUp = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (!pointerDragging) return;
+      const pos = screenToSvgPct(e.clientX, e.clientY);
+      if (pos) {
+        saveCoordinate(
+          { func_loc_id: pointerDragging, floor_id: activeFloor, ...pos },
+          {
+            onSuccess: () => notify('success', `${pointerDragging} repositioned to (${pos.x_pos.toFixed(1)}%, ${pos.y_pos.toFixed(1)}%)`),
+            onError: (err) => notify('error', err.message),
+          },
+        );
+      }
+      setPointerDragging(null);
+      setPreviewPos(null);
+    },
+    [pointerDragging, activeFloor, saveCoordinate, screenToSvgPct],
+  );
+
   const handleUnmap = (funcLocId: string) => {
     deleteCoordinate(funcLocId, {
       onSuccess: () => notify('success', `${funcLocId} removed from map`),
@@ -217,7 +296,7 @@ export default function CoordinateMapper() {
     });
   };
 
-  const markerColour = getMarkerColor(activeFloor);
+  const isAnyDragging = !!dragging || !!pointerDragging;
 
   return (
     <div className="em-mapper-container">
@@ -420,32 +499,45 @@ export default function CoordinateMapper() {
             bottom: 0,
             width: '100%',
             height: 'calc(100% - var(--cds-spacing-09))',
-            cursor: dragging ? 'crosshair' : 'default',
+            cursor: isAnyDragging ? 'crosshair' : 'default',
             overflow: 'visible',
           }}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          onPointerMove={handleSvgPointerMove}
+          onPointerUp={handleSvgPointerUp}
         >
           {floorMapped.map((loc) => {
             const cx = ((loc.x_pos ?? 0) / 100) * viewWidth;
             const cy = ((loc.y_pos ?? 0) / 100) * viewHeight;
-            const isBeingDragged = dragging?.funcLocId === loc.func_loc_id;
+            const isPointerMoving = pointerDragging === loc.func_loc_id;
+            const status = statusMap.get(loc.func_loc_id) ?? 'NO_DATA';
+            const markerClass = STATUS_CLASS[status] ?? STATUS_CLASS.NO_DATA;
+            const labelFill = STATUS_FILL[markerClass] ?? 'var(--cds-text-placeholder)';
+
             return (
               <g
                 key={loc.func_loc_id}
-                style={{ cursor: 'grab', opacity: isBeingDragged ? 0.3 : 1 }}
-                {...({ draggable: true } as any)}
-                onDragStart={() => setDragging({ funcLocId: loc.func_loc_id })}
-                onDragEnd={() => setDragging(null)}
+                style={{
+                  cursor: isPointerMoving ? 'grabbing' : 'grab',
+                  opacity: isPointerMoving ? 0.4 : 1,
+                  touchAction: 'none',
+                }}
+                onPointerDown={(e) => handleMarkerPointerDown(e, loc.func_loc_id)}
               >
-                <circle cx={cx} cy={cy} r={MARKER_R + 4} fill={markerColour} opacity={0.15} />
-                <circle cx={cx} cy={cy} r={MARKER_R} fill={markerColour} stroke="var(--cds-background)" strokeWidth={1.5} />
+                {/* Transparent hit area for easier grabbing */}
+                <circle cx={cx} cy={cy} r={MARKER_R + 6} fill="transparent" />
+                {/* Halo */}
+                <circle cx={cx} cy={cy} r={MARKER_R + 4} className={markerClass} opacity={0.18} />
+                {/* Main circle */}
+                <circle cx={cx} cy={cy} r={MARKER_R} className={markerClass} stroke="var(--cds-background)" strokeWidth={1.5} />
+                {/* Label */}
                 <text
                   x={cx}
                   y={cy - MARKER_R - 4}
                   textAnchor="middle"
                   fontSize={10}
-                  fill={markerColour}
+                  fill={labelFill}
                   fontWeight="600"
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >
@@ -455,6 +547,21 @@ export default function CoordinateMapper() {
             );
           })}
 
+          {/* Preview ghost while pointer-dragging a marker */}
+          {pointerDragging && previewPos && (
+            <circle
+              cx={previewPos.cx}
+              cy={previewPos.cy}
+              r={MARKER_R}
+              fill="none"
+              stroke="var(--cds-interactive-01)"
+              strokeWidth={2}
+              strokeDasharray="4 3"
+              pointerEvents="none"
+            />
+          )}
+
+          {/* Drop-zone hint for sidebar drags */}
           {dragging && (
             <rect
               x={0} y={0} width={viewWidth} height={viewHeight}
@@ -494,13 +601,17 @@ export default function CoordinateMapper() {
           </div>
         )}
 
-        {dragging && (
+        {isAnyDragging && (
           <div style={{
             position: 'absolute', bottom: 'var(--cds-spacing-05)', left: '50%',
             transform: 'translateX(-50%)',
             pointerEvents: 'none', zIndex: 20,
           }}>
-            <Tag type="blue">Drop to place {dragging.funcLocId} on {currentFloor?.floor_name || activeFloor}</Tag>
+            <Tag type="blue">
+              {dragging
+                ? `Drop to place ${dragging.funcLocId} on ${currentFloor?.floor_name || activeFloor}`
+                : `Drag to reposition ${pointerDragging}`}
+            </Tag>
           </div>
         )}
       </div>

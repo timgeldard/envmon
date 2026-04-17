@@ -174,11 +174,11 @@
 }
 
 /* In admin mode the fixed banner (2rem) sits on top of the content area,
-   obscuring the top of the mapper canvas. Shift content down and shrink
-   height to keep everything within the viewport. */
+   obscuring the top of the mapper canvas. padding-top pushes flex content
+   below the banner. Height is unchanged — Carbon's margin-top already
+   positions the element below the header; padding-top alone is sufficient. */
 .em-main-content[data-admin-mode="true"] {
   padding-top: var(--admin-banner-height) !important;
-  height: calc(100vh - var(--shell-header-height) - var(--admin-banner-height)) !important;
 }
 
 /* Content body — positioning context for the absolutely-placed floor plan */
