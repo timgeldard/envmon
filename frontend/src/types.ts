@@ -10,6 +10,9 @@ export interface FloorInfo {
   floor_id: string;
   floor_name: string;
   location_count: number;
+  svg_url: string | null;
+  svg_width: number | null;
+  svg_height: number | null;
 }
 
 export interface LocationMeta {

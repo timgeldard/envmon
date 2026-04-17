@@ -3,6 +3,8 @@ GET /api/em/floors    — list floors with mapped location counts
 GET /api/em/locations — all functional locations for a floor (mapped + unmapped)
 """
 
+import json
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Header
@@ -19,11 +21,21 @@ from backend.utils.em_config import (
 
 router = APIRouter()
 
-_FLOORS = [
-    {"floor_id": "F1", "floor_name": "Floor 1"},
-    {"floor_id": "F2", "floor_name": "Floor 2"},
-    {"floor_id": "F3", "floor_name": "Floor 3"},
+# Default floors for Seville (P225) if no config provided
+_DEFAULT_FLOORS = [
+    {"floor_id": "F1", "floor_name": "Floor 1", "svg_url": "/assets/floor1.svg", "svg_width": 1021.6, "svg_height": 722.48},
+    {"floor_id": "F2", "floor_name": "Floor 2", "svg_url": "/assets/floor2.svg", "svg_width": 1021.6, "svg_height": 722.48},
+    {"floor_id": "F3", "floor_name": "Floor 3", "svg_url": "/assets/floor3.svg", "svg_width": 1021.6, "svg_height": 722.48},
 ]
+
+def _get_floors_config() -> list[dict]:
+    raw = os.environ.get("EM_FLOOR_CONFIG")
+    if raw:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    return _DEFAULT_FLOORS
 
 
 @router.get("/floors", response_model=list[FloorInfo])
@@ -43,13 +55,17 @@ async def list_floors(
     rows = await run_sql_async(token, sql)
     count_map = {r["floor_id"]: int(r["location_count"] or 0) for r in rows}
 
+    floors_config = _get_floors_config()
     return [
         FloorInfo(
             floor_id=f["floor_id"],
             floor_name=f["floor_name"],
             location_count=count_map.get(f["floor_id"], 0),
+            svg_url=f.get("svg_url"),
+            svg_width=f.get("svg_width"),
+            svg_height=f.get("svg_height"),
         )
-        for f in _FLOORS
+        for f in floors_config
     ]
 
 

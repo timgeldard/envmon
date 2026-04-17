@@ -5,42 +5,35 @@
  * Layout:
  *   <div.em-floorplan-container>          position:absolute inset:0
  *     <img key={svgUrl}>                  floor plan background, object-fit:contain
- *     <svg viewBox="0 0 1021.6 722.48">   marker overlay, same aspect ratio
+ *     <svg viewBox="0 0 W H">             marker overlay, same aspect ratio
  *       <Marker … />
  *
  * Both the <img> and the <svg> use the same viewBox aspect ratio and
  * xMidYMid meet alignment, so % coordinates from the DB map correctly to
  * the visible floor plan area regardless of container size.
- *
- * The <img key={svgUrl}> forces a fresh browser fetch on every floor change,
- * avoiding the browser issue where updating href on an SVG <image> element
- * in place does not trigger a reload.
  */
 
-import React, { useState, useCallback } from 'react';
-import { Loading, InlineNotification } from '@carbon/react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Loading, InlineNotification, IconButton } from '@carbon/react';
+import { Download } from '@carbon/icons-react';
 import { useEM } from '~/context/EMContext';
-import { useHeatmap } from '~/api/client';
+import { useHeatmap, useFloors } from '~/api/client';
 import Marker from './Marker';
 import Tooltip from './Tooltip';
 import type { MarkerData } from '~/types';
 
-import floor1Url from '~/assets/floor1.svg?url';
-import floor2Url from '~/assets/floor2.svg?url';
-import floor3Url from '~/assets/floor3.svg?url';
-
-const FLOOR_SVG: Record<string, string> = {
-  F1: floor1Url,
-  F2: floor2Url,
-  F3: floor3Url,
-};
-
-// ViewBox dimensions — must match the floor plan SVGs
-const SVG_WIDTH = 1021.6;
-const SVG_HEIGHT = 722.48;
+// Default aspect ratio if not provided by backend
+const DEFAULT_WIDTH = 1000;
+const DEFAULT_HEIGHT = 700;
 
 export default function FloorPlan() {
   const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme } = useEM();
+  const { data: floors = [] } = useFloors();
+
+  const currentFloor = useMemo(
+    () => floors.find((f) => f.floor_id === activeFloor) || floors[0],
+    [floors, activeFloor],
+  );
 
   const [tooltip, setTooltip] = useState<{
     marker: MarkerData;
@@ -68,10 +61,50 @@ export default function FloorPlan() {
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  const svgUrl = FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1'];
+  const handleExport = () => {
+    if (!data?.markers.length) return;
+    const headers = ['Functional Location', 'Status', 'Risk Score', 'Fail Count', 'Total Lots', 'X%', 'Y%'];
+    const rows = data.markers.map((m) => [
+      m.func_loc_id,
+      m.status,
+      m.risk_score ?? '',
+      m.fail_count,
+      m.total_count,
+      m.x_pos.toFixed(2),
+      m.y_pos.toFixed(2),
+    ]);
+    const csvContent = [headers, ...rows].map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `em_heatmap_${activeFloor}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.click();
+  };
+
+  const svgUrl = currentFloor?.svg_url;
+  const viewWidth = currentFloor?.svg_width || DEFAULT_WIDTH;
+  const viewHeight = currentFloor?.svg_height || DEFAULT_HEIGHT;
 
   return (
     <div className="em-floorplan-container">
+      {/* Action bar */}
+      <div style={{
+        position: 'absolute', top: 'var(--cds-spacing-05)', right: 'var(--cds-spacing-05)',
+        zIndex: 20, display: 'flex', gap: 'var(--cds-spacing-03)',
+      }}>
+        <IconButton
+          label="Export markers to CSV"
+          kind="ghost"
+          size="md"
+          align="bottom-left"
+          onClick={handleExport}
+          disabled={!data?.markers.length}
+        >
+          <Download size={20} />
+        </IconButton>
+      </div>
+
       {/* Loading spinner */}
       {isLoading && (
         <div style={{
@@ -95,34 +128,36 @@ export default function FloorPlan() {
         </div>
       )}
 
-      {/*
-        Floor plan background — standard <img> with key={svgUrl} so the
-        browser unmounts and reloads the image on every floor switch.
-        object-fit:contain letterboxes the image; the SVG overlay below
-        uses the same aspect ratio so markers stay aligned.
-      */}
-      <img
-        key={svgUrl}
-        src={svgUrl}
-        alt={`Floor plan for ${activeFloor}`}
-        role="img"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          objectPosition: 'center',
-          display: 'block',
-        }}
-      />
+      {/* Floor plan background */}
+      {svgUrl ? (
+        <img
+          key={svgUrl}
+          src={svgUrl}
+          alt={`Floor plan for ${activeFloor}`}
+          role="img"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            display: 'block',
+          }}
+        />
+      ) : (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--cds-text-placeholder)',
+        }}>
+          No floor plan image available.
+        </div>
+      )}
 
-      {/*
-        Marker overlay SVG — same viewBox + preserveAspectRatio as the
-        floor plan image, so SVG coordinates map 1:1 to the visible image.
-      */}
+      {/* Marker overlay SVG */}
       <svg
-        viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+        viewBox={`0 0 ${viewWidth} ${viewHeight}`}
         preserveAspectRatio="xMidYMid meet"
         aria-label={`Heatmap markers for floor ${activeFloor}`}
         style={{
@@ -138,8 +173,8 @@ export default function FloorPlan() {
             key={marker.func_loc_id}
             marker={marker}
             mode={heatmapMode}
-            svgWidth={SVG_WIDTH}
-            svgHeight={SVG_HEIGHT}
+            svgWidth={viewWidth}
+            svgHeight={viewHeight}
             onClick={handleMarkerClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}

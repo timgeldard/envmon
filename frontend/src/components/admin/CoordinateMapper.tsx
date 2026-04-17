@@ -11,7 +11,6 @@
  *   - Floor dropdown in canvas header
  *   - Background <img key> reloads on floor switch
  *   - SVG overlay: drop target + existing mapped markers (draggable to reposition)
- *   - Drop coordinates → viewBox % via getScreenCTM() (same space as FloorPlan)
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -27,32 +26,12 @@ import {
   useMappedLocations,
   useSaveCoordinate,
   useDeleteCoordinate,
+  useFloors,
 } from '~/api/client';
-import floor1Url from '~/assets/floor1.svg?url';
-import floor2Url from '~/assets/floor2.svg?url';
-import floor3Url from '~/assets/floor3.svg?url';
 
-const FLOOR_SVG: Record<string, string> = {
-  F1: floor1Url,
-  F2: floor2Url,
-  F3: floor3Url,
-};
-
-const FLOOR_LABELS: Record<string, string> = {
-  F1: 'Floor 1',
-  F2: 'Floor 2',
-  F3: 'Floor 3',
-};
-
-// SVG dimensions based on source viewBox of floor plans
-const SVG_WIDTH = 1021.6;
-const SVG_HEIGHT = 722.48;
 const MARKER_R = 10;
-const MARKER_COLOURS: Record<string, string> = {
-  F1: 'var(--em-marker-f1)',
-  F2: 'var(--em-marker-f2)',
-  F3: 'var(--em-marker-f3)',
-};
+const DEFAULT_WIDTH = 1000;
+const DEFAULT_HEIGHT = 700;
 
 type DragSource = { funcLocId: string };
 
@@ -74,6 +53,15 @@ function levelsAt(ids: string[], levelIdx: number): string[] {
 export default function CoordinateMapper() {
   const { activeFloor, setActiveFloor } = useEM();
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const { data: floors = [] } = useFloors();
+  const currentFloor = useMemo(
+    () => floors.find((f) => f.floor_id === activeFloor) || floors[0],
+    [floors, activeFloor],
+  );
+
+  const viewWidth = currentFloor?.svg_width || DEFAULT_WIDTH;
+  const viewHeight = currentFloor?.svg_height || DEFAULT_HEIGHT;
 
   // Hierarchy filter state (levels 1–4, 0-indexed as 0–3)
   const [l1, setL1] = useState('');
@@ -104,31 +92,26 @@ export default function CoordinateMapper() {
 
   const allIds = unmapped.map((u) => u.func_loc_id);
 
-  // Level 1 options: all distinct values
   const l1Options = useMemo(() => levelsAt(allIds, 0), [allIds]);
 
-  // Level 2 options: filtered by selected l1
   const l2Ids = useMemo(
     () => (l1 ? allIds.filter((id) => parseLevels(id)[0] === l1) : allIds),
     [allIds, l1],
   );
   const l2Options = useMemo(() => levelsAt(l2Ids, 1), [l2Ids]);
 
-  // Level 3 options: filtered by l1 + l2
   const l3Ids = useMemo(
     () => (l2 ? l2Ids.filter((id) => parseLevels(id)[1] === l2) : l2Ids),
     [l2Ids, l2],
   );
   const l3Options = useMemo(() => levelsAt(l3Ids, 2), [l3Ids]);
 
-  // Level 4 options: filtered by l1 + l2 + l3
   const l4Ids = useMemo(
     () => (l3 ? l3Ids.filter((id) => parseLevels(id)[2] === l3) : l3Ids),
     [l3Ids, l3],
   );
   const l4Options = useMemo(() => levelsAt(l4Ids, 3), [l4Ids]);
 
-  // Final filtered list (level 5 locations after all filters applied)
   const filteredUnmapped = useMemo(() => {
     const lowerQuery = searchQuery.toLowerCase();
     return unmapped.filter((u) => {
@@ -150,7 +133,6 @@ export default function CoordinateMapper() {
     });
   }, [mapped, searchQuery]);
 
-  // Reset child filters when parent changes
   const handleL1 = (v: string) => { setL1(v); setL2(''); setL3(''); setL4(''); };
   const handleL2 = (v: string) => { setL2(v); setL3(''); setL4(''); };
   const handleL3 = (v: string) => { setL3(v); setL4(''); };
@@ -170,11 +152,11 @@ export default function CoordinateMapper() {
       if (!ctm) return null;
       const svgPt = pt.matrixTransform(ctm.inverse());
       return {
-        x_pos: Math.round(Math.max(0, Math.min(100, (svgPt.x / SVG_WIDTH) * 100)) * 100) / 100,
-        y_pos: Math.round(Math.max(0, Math.min(100, (svgPt.y / SVG_HEIGHT) * 100)) * 100) / 100,
+        x_pos: Math.round(Math.max(0, Math.min(100, (svgPt.x / viewWidth) * 100)) * 100) / 100,
+        y_pos: Math.round(Math.max(0, Math.min(100, (svgPt.y / viewHeight) * 100)) * 100) / 100,
       };
     },
-    [],
+    [viewWidth, viewHeight],
   );
 
   const notify = (kind: 'success' | 'error', message: string) => {
@@ -200,7 +182,7 @@ export default function CoordinateMapper() {
         },
       );
     },
-    [dragging, activeFloor, saveCoordinate],
+    [dragging, activeFloor, saveCoordinate, screenToSvgPct],
   );
 
   const handleDragOver = (e: React.DragEvent<SVGSVGElement>) => {
@@ -215,13 +197,10 @@ export default function CoordinateMapper() {
     });
   };
 
-  const markerColour = MARKER_COLOURS[activeFloor] ?? 'var(--em-marker-f1)';
+  const markerColour = `var(--em-marker-${activeFloor.toLowerCase()})`;
 
   return (
     <div className="em-mapper-container">
-      {/* ------------------------------------------------------------------ */}
-      {/* Sidebar                                                             */}
-      {/* ------------------------------------------------------------------ */}
       <div className="em-mapper-sidebar">
         <Tabs>
           <TabList aria-label="Coordinate mapping tabs">
@@ -230,9 +209,7 @@ export default function CoordinateMapper() {
           </TabList>
 
           <TabPanels>
-            {/* Unmapped tab */}
             <TabPanel>
-              {/* Cascading hierarchy filters */}
               <div className="em-hierarchy-filters">
                 <Select
                   id="filter-l1"
@@ -325,7 +302,6 @@ export default function CoordinateMapper() {
               ))}
             </TabPanel>
 
-            {/* Mapped tab */}
             <TabPanel>
               {loadingMapped && <Loading description="Loading…" withOverlay={false} small />}
 
@@ -333,7 +309,9 @@ export default function CoordinateMapper() {
                 <p style={{ color: 'var(--cds-text-secondary)', fontSize: 'var(--cds-label-01-font-size)', marginTop: 'var(--cds-spacing-04)' }}>
                   {mapped.length === 0
                     ? 'No locations mapped yet.'
-                    : 'No mapped locations match the search.'}
+                    : searchQuery
+                      ? 'No mapped locations match the search.'
+                      : 'No mapped locations.'}
                 </p>
               )}
 
@@ -369,11 +347,7 @@ export default function CoordinateMapper() {
         </Tabs>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Floor plan canvas                                                   */}
-      {/* ------------------------------------------------------------------ */}
       <div className="em-mapper-canvas">
-        {/* Floor selector */}
         <div className="em-mapper-floor-bar">
           <Select
             id="mapper-floor-select"
@@ -384,8 +358,8 @@ export default function CoordinateMapper() {
             onChange={(e) => setActiveFloor(e.target.value)}
             style={{ width: '140px' }}
           >
-            {Object.entries(FLOOR_LABELS).map(([id, label]) => (
-              <SelectItem key={id} value={id} text={label} />
+            {floors.map((f) => (
+              <SelectItem key={f.floor_id} value={f.floor_id} text={f.floor_name} />
             ))}
           </Select>
           <span className="em-mapper-floor-count">
@@ -393,30 +367,30 @@ export default function CoordinateMapper() {
           </span>
         </div>
 
-        {/* Background floor plan — below the floor bar */}
-        <img
-          key={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
-          src={FLOOR_SVG[activeFloor] ?? FLOOR_SVG['F1']}
-          alt={`Floor ${activeFloor} plan`}
-          style={{
-            position: 'absolute',
-            top: 'var(--cds-spacing-09)',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: 'calc(100% - var(--cds-spacing-09))',
-            objectFit: 'contain',
-            objectPosition: 'center',
-            display: 'block',
-            pointerEvents: 'none',
-          }}
-        />
+        {currentFloor?.svg_url && (
+          <img
+            key={currentFloor.svg_url}
+            src={currentFloor.svg_url}
+            alt={`${currentFloor.floor_name} plan`}
+            style={{
+              position: 'absolute',
+              top: 'var(--cds-spacing-09)',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: 'calc(100% - var(--cds-spacing-09))',
+              objectFit: 'contain',
+              objectPosition: 'center',
+              display: 'block',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
 
-        {/* SVG overlay — drop target + marker display */}
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+          viewBox={`0 0 ${viewWidth} ${viewHeight}`}
           preserveAspectRatio="xMidYMid meet"
           style={{
             position: 'absolute',
@@ -433,8 +407,8 @@ export default function CoordinateMapper() {
           onDragOver={handleDragOver}
         >
           {floorMapped.map((loc) => {
-            const cx = ((loc.x_pos ?? 0) / 100) * SVG_WIDTH;
-            const cy = ((loc.y_pos ?? 0) / 100) * SVG_HEIGHT;
+            const cx = ((loc.x_pos ?? 0) / 100) * viewWidth;
+            const cy = ((loc.y_pos ?? 0) / 100) * viewHeight;
             const isBeingDragged = dragging?.funcLocId === loc.func_loc_id;
             return (
               <g
@@ -463,7 +437,7 @@ export default function CoordinateMapper() {
 
           {dragging && (
             <rect
-              x={0} y={0} width={SVG_WIDTH} height={SVG_HEIGHT}
+              x={0} y={0} width={viewWidth} height={viewHeight}
               fill="var(--cds-interactive-01)"
               opacity={0.05}
               stroke="var(--cds-interactive-01)"
@@ -506,7 +480,7 @@ export default function CoordinateMapper() {
             transform: 'translateX(-50%)',
             pointerEvents: 'none', zIndex: 20,
           }}>
-            <Tag type="blue">Drop to place {dragging.funcLocId} on {FLOOR_LABELS[activeFloor]}</Tag>
+            <Tag type="blue">Drop to place {dragging.funcLocId} on {currentFloor?.floor_name || activeFloor}</Tag>
           </div>
         )}
       </div>

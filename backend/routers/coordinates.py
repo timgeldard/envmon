@@ -211,7 +211,10 @@ async def get_location_summary(
         SELECT DISTINCT UPPER(TRIM(r.MIC_NAME)) AS mic_name
         FROM {LOT_TBL} lot
         JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
-        JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+        JOIN {RESULT_TBL} r
+            ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+           AND ip.OPERATION_ID      = r.OPERATION_ID
+           AND ip.SAMPLE_ID         = r.SAMPLE_ID
         WHERE lot.PLANT_ID = :plant_id
           AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
           AND ip.FUNCTIONAL_LOCATION = :func_loc_id
@@ -231,7 +234,10 @@ async def get_location_summary(
             MAX(CASE r.INSPECTION_RESULT_VALUATION WHEN 'R' THEN 'R' WHEN 'W' THEN 'W' WHEN 'A' THEN 'A' ELSE NULL END) AS valuation
         FROM {LOT_TBL} lot
         JOIN {POINT_TBL} ip ON lot.INSPECTION_LOT_ID = ip.INSPECTION_LOT_ID
-        LEFT JOIN {RESULT_TBL} r ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+        LEFT JOIN {RESULT_TBL} r
+            ON ip.INSPECTION_LOT_ID = r.INSPECTION_LOT_ID
+           AND ip.OPERATION_ID      = r.OPERATION_ID
+           AND ip.SAMPLE_ID         = r.SAMPLE_ID
         WHERE lot.PLANT_ID = :plant_id
           AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
           AND ip.FUNCTIONAL_LOCATION = :func_loc_id

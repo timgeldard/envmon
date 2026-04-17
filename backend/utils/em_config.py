@@ -7,17 +7,28 @@ Unity Catalog schema: TRACE_CATALOG.TRACE_SCHEMA (connected_plant_uat.gold by de
 import os
 from backend.utils.db import TRACE_CATALOG, TRACE_SCHEMA
 
-# Plant scope — Seville plant code
+# Plant scope — Seville plant code (P225)
 PLANT_ID: str = os.environ.get("EM_PLANT_ID", "P225")
 
-# SAP inspection types used for environmental monitoring
-INSPECTION_TYPES: tuple[str, ...] = ("14", "Z14")
+# SAP inspection types used for environmental monitoring (e.g. "14,Z14")
+INSPECTION_TYPES_RAW = os.environ.get("EM_INSPECTION_TYPES", "14,Z14")
+INSPECTION_TYPES: tuple[str, ...] = tuple(t.strip() for t in INSPECTION_TYPES_RAW.split(",") if t.strip())
 
-# Canonical table references (fully-qualified, backtick-quoted)
-LOT_TBL    = f"`{TRACE_CATALOG}`.`{TRACE_SCHEMA}`.`gold_inspection_lot`"
-POINT_TBL  = f"`{TRACE_CATALOG}`.`{TRACE_SCHEMA}`.`gold_inspection_point`"
-RESULT_TBL = f"`{TRACE_CATALOG}`.`{TRACE_SCHEMA}`.`gold_batch_quality_result_v`"
-COORD_TBL  = f"`{TRACE_CATALOG}`.`{TRACE_SCHEMA}`.`em_location_coordinates`"
+# Canonical table names (catalog.schema.table)
+LOT_TBL_NAME    = os.environ.get("EM_LOT_TABLE", f"{TRACE_CATALOG}.{TRACE_SCHEMA}.gold_inspection_lot")
+POINT_TBL_NAME  = os.environ.get("EM_POINT_TABLE", f"{TRACE_CATALOG}.{TRACE_SCHEMA}.gold_inspection_point")
+RESULT_TBL_NAME = os.environ.get("EM_RESULT_TABLE", f"{TRACE_CATALOG}.{TRACE_SCHEMA}.gold_batch_quality_result_v")
+COORD_TBL_NAME  = os.environ.get("EM_COORD_TABLE", f"{TRACE_CATALOG}.{TRACE_SCHEMA}.em_location_coordinates")
+
+# Fully-qualified, backtick-quoted references
+def _quote(tbl: str) -> str:
+    parts = tbl.replace("`", "").split(".")
+    return ".".join(f"`{p}`" for p in parts)
+
+LOT_TBL    = _quote(LOT_TBL_NAME)
+POINT_TBL  = _quote(POINT_TBL_NAME)
+RESULT_TBL = _quote(RESULT_TBL_NAME)
+COORD_TBL  = _quote(COORD_TBL_NAME)
 
 # SQL IN clause for inspection types — e.g. "('14', 'Z14')"
 INSP_TYPES_SQL = "(" + ", ".join(f"'{t}'" for t in INSPECTION_TYPES) + ")"

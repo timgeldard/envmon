@@ -43,6 +43,7 @@ export default function AppShell() {
         '--shell-header-height': 'var(--cds-spacing-09, 3rem)',
         '--admin-banner-height': 'var(--cds-spacing-07, 2rem)',
         '--side-nav-width': isSideNavExpanded && !adminMode ? '16rem' : '0rem',
+        '--side-nav-expanded': isSideNavExpanded ? '1' : '0',
       } as React.CSSProperties}
     >
       <SkipToContent href="#main-content" />

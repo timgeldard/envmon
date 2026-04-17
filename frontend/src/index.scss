@@ -115,10 +115,10 @@ body,
 /* Side panel */
 .em-side-panel {
   position: fixed;
-  top: var(--cds-spacing-09);
+  top: var(--shell-header-height);
   right: 0;
   width: 20rem; /* Carbon standard side panel width (~320px) */
-  height: calc(100% - var(--cds-spacing-09));
+  height: calc(100% - var(--shell-header-height));
   background: var(--cds-layer-01);
   border-left: 1px solid var(--cds-border-subtle-01);
   overflow-y: auto;
@@ -130,6 +130,14 @@ body,
   &--expanded {
     width: 40rem; /* Wide view for detailed trends/tables */
     max-width: 80vw;
+  }
+
+  @media (max-width: 66rem) {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-left: none;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 10000; /* Over everything */
   }
 }
 
@@ -363,4 +371,52 @@ body,
 .em-mapper-floor-count {
   font-size: var(--cds-label-01-font-size, 0.75rem);
   color: var(--cds-text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+   Media queries for responsiveness
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 66rem) {
+  .em-main-content {
+    margin-left: 0 !important;
+  }
+
+  .em-filter-bar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+
+    /* Direct children that should wrap */
+    > .cds--layer {
+      display: contents;
+    }
+
+    .cds--select,
+    .cds--toggle {
+      max-width: none !important;
+      flex: 1 1 auto !important;
+    }
+
+    /* Slider container */
+    div[style*="max-width: 24rem"] {
+      max-width: 100% !important;
+      flex: 1 1 100% !important;
+      margin-left: 0 !important;
+      order: 10;
+    }
+  }
+
+  .em-mapper-container {
+    flex-direction: column;
+  }
+
+  .em-mapper-sidebar {
+    width: 100% !important;
+    max-width: none !important;
+    height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+  }
 }

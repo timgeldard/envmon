@@ -55,6 +55,9 @@ class FloorInfo(BaseModel):
     floor_id: str
     floor_name: str
     location_count: int
+    svg_url: Optional[str] = None
+    svg_width: Optional[float] = None
+    svg_height: Optional[float] = None
 
 
 class LocationMeta(BaseModel):
