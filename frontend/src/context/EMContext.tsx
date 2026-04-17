@@ -21,6 +21,8 @@ interface EMState {
   sidePanelExpanded: boolean;
   theme: 'white' | 'g100';
   historicalDate: string | null;
+  decayLambda: number;
+  selectedMics: string[];
 }
 
 interface EMActions {
@@ -32,6 +34,8 @@ interface EMActions {
   setSidePanelExpanded: (on: boolean) => void;
   setTheme: (theme: 'white' | 'g100') => void;
   setHistoricalDate: (date: string | null) => void;
+  setDecayLambda: (val: number) => void;
+  setSelectedMics: (mics: string[]) => void;
 }
 
 const EMContext = createContext<(EMState & EMActions) | null>(null);
@@ -61,10 +65,22 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
     () => readSearchParam<string>('theme', 'white', ['white', 'g100']) as 'white' | 'g100',
   );
   const [historicalDate, setHistoricalDateRaw] = useState<string | null>(null);
+  const [decayLambda, setDecayLambdaRaw] = useState<number>(() => {
+    const raw = new URLSearchParams(window.location.search).get('lambda');
+    const parsed = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : 0.1;
+  });
+  const [selectedMics, setSelectedMicsRaw] = useState<string[]>(
+    () => new URLSearchParams(window.location.search).get('mics')?.split(',').filter(Boolean) || [],
+  );
 
   const pushParam = useCallback((key: string, value: string) => {
     const sp = new URLSearchParams(window.location.search);
-    sp.set(key, value);
+    if (value) {
+      sp.set(key, value);
+    } else {
+      sp.delete(key);
+    }
     window.history.replaceState(null, '', `?${sp}`);
   }, []);
 
@@ -105,6 +121,22 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
     setHistoricalDateRaw(date);
   }, []);
 
+  const setDecayLambda = useCallback(
+    (val: number) => {
+      setDecayLambdaRaw(val);
+      pushParam('lambda', String(val));
+    },
+    [pushParam],
+  );
+
+  const setSelectedMics = useCallback(
+    (mics: string[]) => {
+      setSelectedMicsRaw(mics);
+      pushParam('mics', mics.join(','));
+    },
+    [pushParam],
+  );
+
   const value = useMemo(
     () => ({
       activeFloor,
@@ -115,6 +147,8 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
       sidePanelExpanded,
       theme,
       historicalDate,
+      decayLambda,
+      selectedMics,
       setActiveFloor,
       setTimeWindow,
       setHeatmapMode,
@@ -123,10 +157,12 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
       setSidePanelExpanded,
       setTheme,
       setHistoricalDate,
+      setDecayLambda,
+      setSelectedMics,
     }),
     [
-      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode, sidePanelExpanded, theme, historicalDate,
-      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId, setAdminMode, setSidePanelExpanded, setTheme, setHistoricalDate,
+      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode, sidePanelExpanded, theme, historicalDate, decayLambda, selectedMics,
+      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId, setSidePanelExpanded, setTheme, setHistoricalDate, setDecayLambda, setSelectedMics,
     ],
   );
 

@@ -15,6 +15,7 @@ interface MarkerProps {
 const STATUS_CLASS: Record<string, string> = {
   PASS:    'em-marker--pass',
   FAIL:    'em-marker--fail',
+  WARNING: 'em-marker--warning',
   PENDING: 'em-marker--pending',
   NO_DATA: 'em-marker--no-data',
 };
@@ -43,6 +44,9 @@ export default function Marker({
     glowOpacity = Math.min(clamped / 5, 0.6);
   }
 
+  // Blast radius scales with SVG dimensions (approx 6% of minimum dimension)
+  const blastRadius = Math.min(svgWidth, svgHeight) * 0.06;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -61,6 +65,16 @@ export default function Marker({
       tabIndex={0}
       aria-label={`Location ${marker.func_loc_id}: ${marker.status}${marker.risk_score !== null ? `, Risk score: ${marker.risk_score.toFixed(2)}` : ''}`}
     >
+      {/* Blast Radius visualization for failed points */}
+      {marker.status === 'FAIL' && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={blastRadius}
+          className="em-blast-radius"
+        />
+      )}
+
       {/* Glow halo for continuous mode */}
       {mode === 'continuous' && glowOpacity > 0 && (
         <circle
@@ -82,8 +96,8 @@ export default function Marker({
         strokeWidth={1.5}
       />
 
-      {/* Fail indicator */}
-      {marker.status === 'FAIL' && (
+      {/* Fail / Warning indicator */}
+      {(marker.status === 'FAIL' || marker.status === 'WARNING') && (
         <text
           x={cx}
           y={cy + 4}
@@ -92,6 +106,7 @@ export default function Marker({
           fill="var(--cds-text-on-color)"
           fontWeight="600"
           className="em-marker-label"
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
         >
           !
         </text>

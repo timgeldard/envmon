@@ -157,7 +157,10 @@ def classify_sql_runtime_error(
     """Map Databricks SQL runtime failures to client-facing HTTP errors."""
     msg = str(exc).lower()
     if "permission denied" in msg or "no access" in msg or "403" in msg:
-        return HTTPException(status_code=403, detail="Access denied by Unity Catalog policy.")
+        return HTTPException(
+            status_code=403,
+            detail="Forbidden: insufficient Unity Catalog privileges for this operation.",
+        )
     if "401" in msg or "unauthorized" in msg:
         return HTTPException(status_code=401, detail="Token rejected by Databricks.")
     if missing_table_detail and (
@@ -450,25 +453,31 @@ async def run_sql_async(
 ) -> list[dict]:
     """Non-blocking wrapper — runs run_sql in a thread pool so the async event
     loop is never blocked waiting for Databricks SQL responses."""
-    if not _is_read_only_statement(statement):
+    try:
+        if not _is_read_only_statement(statement):
+            loop = asyncio.get_running_loop()
+            rows = await loop.run_in_executor(_sql_executor, lambda: run_sql(token, statement, params))
+            if _is_write_statement(statement):
+                _clear_sql_cache()
+            return rows
+
+        cache_key = _sql_cache_key(token, statement, params)
+        with _sql_cache_lock:
+            cached_rows = _sql_cache.get(cache_key)
+        if cached_rows is not None:
+            return deepcopy(cached_rows)
+
         loop = asyncio.get_running_loop()
         rows = await loop.run_in_executor(_sql_executor, lambda: run_sql(token, statement, params))
-        if _is_write_statement(statement):
-            _clear_sql_cache()
+        if _should_cache_rows(rows):
+            with _sql_cache_lock:
+                _sql_cache[cache_key] = deepcopy(rows)
         return rows
-
-    cache_key = _sql_cache_key(token, statement, params)
-    with _sql_cache_lock:
-        cached_rows = _sql_cache.get(cache_key)
-    if cached_rows is not None:
-        return deepcopy(cached_rows)
-
-    loop = asyncio.get_running_loop()
-    rows = await loop.run_in_executor(_sql_executor, lambda: run_sql(token, statement, params))
-    if _should_cache_rows(rows):
-        with _sql_cache_lock:
-            _sql_cache[cache_key] = deepcopy(rows)
-    return rows
+    except Exception as exc:
+        mapped_error = classify_sql_runtime_error(exc)
+        if mapped_error:
+            raise mapped_error from exc
+        raise
 
 
 def get_data_freshness(token: str, source_views: list[str]) -> dict:
