@@ -66,8 +66,12 @@ async def list_floors(
         FROM {COORD_TBL}
         GROUP BY floor_id
     """
-    rows = await run_sql_async(token, sql)
-    count_map = {r["floor_id"]: int(r["location_count"] or 0) for r in rows}
+    try:
+        rows = await run_sql_async(token, sql)
+        count_map = {r["floor_id"]: int(r["location_count"] or 0) for r in rows}
+    except Exception:
+        logging.getLogger(__name__).warning("floors: location count query failed, returning defaults")
+        count_map = {}
 
     floors_config = _get_floors_config()
     return [
