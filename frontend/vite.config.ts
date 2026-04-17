@@ -33,7 +33,8 @@ export default defineConfig({
               if (id.includes('es/')) {
                 const parts = id.split('es/')[1].split('/');
                 if (parts.length > 0) {
-                  return `vendor-icons-${parts[0].charAt(0).toLowerCase()}`;
+                  const key = parts[0].replace(/^@/, '').charAt(0).toLowerCase();
+                  return `vendor-icons-${key || 'other'}`;
                 }
               }
               return 'vendor-icons';
