@@ -26,6 +26,16 @@ import type { MarkerData } from '~/types';
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
 
+/** Escape and quote a value for CSV */
+function escapeCsv(val: any): string {
+  if (val === null || val === undefined) return '""';
+  let s = String(val);
+  // Guard against CSV injection
+  if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
+  // Escape double quotes
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 export default function FloorPlan() {
   const { activeFloor, heatmapMode, timeWindow, setSelectedLocId, historicalDate, theme, decayLambda, selectedMics } = useEM();
   const { data: floors = [] } = useFloors();
@@ -75,13 +85,25 @@ export default function FloorPlan() {
       m.x_pos.toFixed(2),
       m.y_pos.toFixed(2),
     ]);
-    const csvContent = [headers, ...rows].map((r) => r.join(',')).join('\n');
+    
+    const csvContent = [headers, ...rows]
+      .map((r) => r.map(escapeCsv).join(','))
+      .join('\n');
+    
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', `em_heatmap_${activeFloor}_${new Date().toISOString().split('T')[0]}.csv`);
+    
+    document.body.appendChild(link);
     link.click();
+    
+    // Cleanup
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    }, 100);
   };
 
   const svgUrl = currentFloor?.svg_url;

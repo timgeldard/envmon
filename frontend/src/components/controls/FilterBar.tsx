@@ -36,7 +36,7 @@ export default function FilterBar() {
 
   const { data: allMics = [] } = useMics();
   const [isPlaying, setIsPlaying] = useState(false);
-  const playbackRef = useRef<NodeJS.Timeout | null>(null);
+  const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Clamp or clear historicalDate when timeWindow shrinks
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function FilterBar() {
       if (playbackRef.current) clearInterval(playbackRef.current);
     }
     return () => { if (playbackRef.current) clearInterval(playbackRef.current); };
-  }, [isPlaying, timeWindow, setHistoricalDate]);
+  }, [isPlaying, timeWindow, setHistoricalDate, historicalDate]);
 
   const handleSliderChange = ({ value }: { value: number }) => {
     if (isPlaying) setIsPlaying(false);
@@ -115,7 +115,7 @@ export default function FilterBar() {
             label="All characteristic types"
             titleText=""
             items={allMics}
-            initialSelectedItems={selectedMics}
+            selectedItems={selectedMics}
             onChange={({ selectedItems }) => setSelectedMics(selectedItems ?? [])}
             size="sm"
             type="inline"
@@ -135,7 +135,7 @@ export default function FilterBar() {
         />
 
         {heatmapMode === 'continuous' && (
-          <div style={{ flex: 1, maxWidth: '14rem', marginLeft: 'var(--cds-spacing-05)' }}>
+          <div className="em-filter-bar__slider" style={{ flex: 1, maxWidth: '14rem', marginLeft: 'var(--cds-spacing-05)' }}>
             <Slider
               id="risk-sensitivity"
               labelText={`Sensitivity (HL: ${Math.round(Math.log(2) / decayLambda)}d)`}
@@ -149,7 +149,7 @@ export default function FilterBar() {
           </div>
         )}
 
-        <div style={{ flex: 1, maxWidth: '24rem', marginLeft: 'var(--cds-spacing-07)', display: 'flex', alignItems: 'center', gap: 'var(--cds-spacing-03)' }}>
+        <div className="em-filter-bar__slider" style={{ flex: 1, maxWidth: '24rem', marginLeft: 'var(--cds-spacing-07)', display: 'flex', alignItems: 'center', gap: 'var(--cds-spacing-03)' }}>
           <IconButton
             label={isPlaying ? 'Pause playback' : 'Play time-lapse'}
             kind="ghost"

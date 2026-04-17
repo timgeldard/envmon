@@ -4,7 +4,9 @@ GET /api/em/locations — all functional locations for a floor (mapped + unmappe
 """
 
 import json
+import logging
 import os
+from functools import lru_cache
 from typing import Optional
 
 from fastapi import APIRouter, Header
@@ -28,14 +30,26 @@ _DEFAULT_FLOORS = [
     {"floor_id": "F3", "floor_name": "Floor 3", "svg_url": "/assets/floor3.svg", "svg_width": 1021.6, "svg_height": 722.48},
 ]
 
+@lru_cache(maxsize=1)
 def _get_floors_config() -> list[dict]:
     raw = os.environ.get("EM_FLOOR_CONFIG")
-    if raw:
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-    return _DEFAULT_FLOORS
+    if not raw:
+        return _DEFAULT_FLOORS
+
+    try:
+        config = json.loads(raw)
+        if not isinstance(config, list):
+            raise ValueError("Floor config must be a list of dicts.")
+
+        # Basic validation of required keys
+        for idx, f in enumerate(config):
+            if "floor_id" not in f or "floor_name" not in f:
+                raise ValueError(f"Floor at index {idx} missing floor_id or floor_name.")
+
+        return config
+    except (json.JSONDecodeError, ValueError) as exc:
+        logging.warning(f"Failed to parse EM_FLOOR_CONFIG, falling back to defaults. Error: {exc}")
+        return _DEFAULT_FLOORS
 
 
 @router.get("/floors", response_model=list[FloorInfo])

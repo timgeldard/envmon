@@ -43,6 +43,11 @@ async def list_mics(
     if func_loc_id:
         params.append(sql_param("func_loc_id", func_loc_id))
         where_clause = "AND ip.FUNCTIONAL_LOCATION = :func_loc_id"
+    else:
+        # Avoid unbounded scan if no location is specified
+        date_from = (date.today() - timedelta(days=180)).isoformat()
+        params.append(sql_param("date_from", date_from))
+        where_clause = "AND lot.CREATED_DATE >= :date_from"
 
     sql = f"""
         SELECT DISTINCT UPPER(TRIM(r.MIC_NAME)) AS mic_name

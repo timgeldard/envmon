@@ -65,9 +65,11 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
     () => readSearchParam<string>('theme', 'white', ['white', 'g100']) as 'white' | 'g100',
   );
   const [historicalDate, setHistoricalDateRaw] = useState<string | null>(null);
-  const [decayLambda, setDecayLambdaRaw] = useState<number>(
-    () => Number(new URLSearchParams(window.location.search).get('lambda')) || 0.1,
-  );
+  const [decayLambda, setDecayLambdaRaw] = useState<number>(() => {
+    const raw = new URLSearchParams(window.location.search).get('lambda');
+    const parsed = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : 0.1;
+  });
   const [selectedMics, setSelectedMicsRaw] = useState<string[]>(
     () => new URLSearchParams(window.location.search).get('mics')?.split(',').filter(Boolean) || [],
   );

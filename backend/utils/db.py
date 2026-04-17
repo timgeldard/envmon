@@ -159,7 +159,7 @@ def classify_sql_runtime_error(
     if "permission denied" in msg or "no access" in msg or "403" in msg:
         return HTTPException(
             status_code=403,
-            detail="Forbidden: You lack the necessary authoring privileges to perform this operation via Unity Catalog.",
+            detail="Forbidden: insufficient Unity Catalog privileges for this operation.",
         )
     if "401" in msg or "unauthorized" in msg:
         return HTTPException(status_code=401, detail="Token rejected by Databricks.")

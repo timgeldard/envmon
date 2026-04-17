@@ -13,7 +13,7 @@
  *   - SVG overlay: drop target + existing mapped markers (draggable to reposition)
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Tag, InlineNotification, Loading, Button,
   Tabs, Tab, TabList, TabPanels, TabPanel,
@@ -32,6 +32,15 @@ import {
 const MARKER_R = 10;
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 700;
+
+/** Deterministic marker color based on floor ID */
+function getMarkerColor(floorId: string): string {
+  const id = floorId.toUpperCase();
+  if (id.includes('F1')) return 'var(--em-marker-f1)';
+  if (id.includes('F2')) return 'var(--em-marker-f2)';
+  if (id.includes('F3')) return 'var(--em-marker-f3)';
+  return 'var(--cds-interactive-01)'; // Fallback
+}
 
 type DragSource = { funcLocId: string };
 
@@ -55,6 +64,17 @@ export default function CoordinateMapper() {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const { data: floors = [] } = useFloors();
+
+  // Sync activeFloor if it's invalid (e.g. from a stale URL param)
+  useEffect(() => {
+    if (floors.length > 0) {
+      const exists = floors.some((f) => f.floor_id === activeFloor);
+      if (!exists) {
+        setActiveFloor(floors[0].floor_id);
+      }
+    }
+  }, [floors, activeFloor, setActiveFloor]);
+
   const currentFloor = useMemo(
     () => floors.find((f) => f.floor_id === activeFloor) || floors[0],
     [floors, activeFloor],
@@ -197,7 +217,7 @@ export default function CoordinateMapper() {
     });
   };
 
-  const markerColour = `var(--em-marker-${activeFloor.toLowerCase()})`;
+  const markerColour = getMarkerColor(activeFloor);
 
   return (
     <div className="em-mapper-container">

@@ -30,8 +30,15 @@ from backend.utils.em_config import (
 
 router = APIRouter()
 
-# Default decay constant yielding a ~7 day half-life (ln2/0.1 ≈ 6.93)
-_DEFAULT_LAMBDA = float(os.environ.get("EM_DEFAULT_DECAY_LAMBDA", "0.1"))
+def _get_default_lambda() -> float:
+    raw = os.environ.get("EM_DEFAULT_DECAY_LAMBDA", "0.1").strip()
+    try:
+        val = float(raw)
+        return min(max(val, 0.0), 1.0)
+    except (ValueError, TypeError):
+        return 0.1
+
+_DEFAULT_LAMBDA = _get_default_lambda()
 
 
 def _risk_score(rows: list[dict], today: date, decay_lambda: float) -> float:
@@ -69,29 +76,38 @@ def _check_spc_warning(rows: list[dict]) -> bool:
     """
     Apply lightweight SPC rules for Early Warning.
     Nelson Rule 1 variant: 3 consecutive rising quantitative swabs.
+    Evaluated per mic_name.
     """
-    # Sort by date
-    sorted_rows = sorted(
-        [r for r in rows if r.get("result_value") is not None],
-        key=lambda x: x["lot_date"]
-    )
-    if len(sorted_rows) < 3:
-        return False
+    # Group by MIC name
+    mic_groups = defaultdict(list)
+    for r in rows:
+        if r.get("mic_name") and r.get("result_value") is not None:
+            mic_groups[r["mic_name"]].append(r)
 
-    last_3 = sorted_rows[-3:]
-    v1, v2, v3 = last_3[0]["result_value"], last_3[1]["result_value"], last_3[2]["result_value"]
+    for mic_name, group in mic_groups.items():
+        # Sort by date
+        sorted_group = sorted(group, key=lambda x: x["lot_date"])
+        if len(sorted_group) < 3:
+            continue
 
-    # Strictly increasing?
-    if v3 > v2 > v1:
-        # approaching upper limit? (if limit exists)
-        limit = last_3[2].get("upper_limit")
-        if limit is not None and limit > 0:
-            if v3 >= (limit * 0.5): # flag if > 50% of limit
-                return True
-        else:
-            # no limit, just flag the trend if it's substantial (> 10% rise)
-            if (v3 / v1) > 1.1:
-                return True
+        last_3 = sorted_group[-3:]
+        v1, v2, v3 = last_3[0]["result_value"], last_3[1]["result_value"], last_3[2]["result_value"]
+
+        # Strictly increasing?
+        if v3 > v2 > v1:
+            # approaching upper limit? (if limit exists)
+            limit = last_3[2].get("upper_limit")
+            if limit is not None and limit > 0:
+                if v3 >= (limit * 0.5): # flag if > 50% of limit
+                    return True
+            else:
+                # no limit, flag if rise is substantial
+                # v1 might be 0, handle division by zero
+                if v1 == 0:
+                    if v3 >= 1.0: # arbitrary threshold for 0 baseline
+                        return True
+                elif (v3 / v1) > 1.1:
+                    return True
 
     return False
 
@@ -175,12 +191,33 @@ async def get_heatmap(
 
     markers: list[MarkerData] = []
 
+    # Valuation ranking for worst-case collapse
+    VAL_RANK = {"R": 2, "W": 1, "A": 0}
+
     for func_loc_id, meta in coord_map.items():
         results = loc_results.get(func_loc_id, [])
-        total_lots = len(set(r["lot_id"] for r in results if r.get("lot_id")))
-        fail_count = sum(1 for r in results if r.get("valuation") == "R")
-        pass_count = sum(1 for r in results if r.get("valuation") == "A")
-        pending_count = sum(1 for r in results if r.get("lot_id") and r.get("lot_end_date") is None)
+        
+        # Collapse results to per-lot metrics
+        lots_info = {}
+        for r in results:
+            lid = r["lot_id"]
+            if lid not in lots_info:
+                lots_info[lid] = {
+                    "valuation": None,
+                    "end_date": r.get("lot_end_date")
+                }
+            
+            # Update worst valuation for this lot
+            current_val = r.get("valuation")
+            if current_val in VAL_RANK:
+                existing_val = lots_info[lid]["valuation"]
+                if existing_val is None or VAL_RANK[current_val] > VAL_RANK[existing_val]:
+                    lots_info[lid]["valuation"] = current_val
+
+        total_lots = len(lots_info)
+        fail_count = sum(1 for info in lots_info.values() if info["valuation"] == "R")
+        pass_count = sum(1 for info in lots_info.values() if info["valuation"] == "A")
+        pending_count = sum(1 for info in lots_info.values() if info["end_date"] is None)
 
         if mode == "deterministic":
             if total_lots == 0:

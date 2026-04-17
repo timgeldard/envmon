@@ -44,6 +44,9 @@ export default function Marker({
     glowOpacity = Math.min(clamped / 5, 0.6);
   }
 
+  // Blast radius scales with SVG dimensions (approx 6% of minimum dimension)
+  const blastRadius = Math.min(svgWidth, svgHeight) * 0.06;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -67,7 +70,7 @@ export default function Marker({
         <circle
           cx={cx}
           cy={cy}
-          r={60}
+          r={blastRadius}
           className="em-blast-radius"
         />
       )}

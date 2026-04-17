@@ -12,73 +12,106 @@
    Application layout
    --------------------------------------------------------------------------- */
 
-/* Ensure skip link is visually hidden until keyboard-focused */
-.cds--skip-to-content:not(:focus) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
+:root {
+  --shell-header-height: 3rem;
+  --admin-banner-height: 2rem;
+  --em-z-side-panel: 200;
+  --em-z-mobile-overlay: 10000;
 }
 
 .em-app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.em-main-content {
-  padding: 0 !important; /* Handle internal padding manually to maintain full-bleed feel */
-  margin-top: var(--shell-header-height);
-  margin-left: var(--side-nav-width);
-  height: calc(100vh - var(--shell-header-height));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: margin-left 110ms var(--cds-motion-easing-standard, ease);
   background: var(--cds-background);
+  color: var(--cds-text-primary);
+  min-height: 100vh;
 }
 
-.em-main-content[data-admin-mode='true'] {
-  margin-top: calc(var(--shell-header-height) + var(--admin-banner-height));
-  height: calc(100vh - (var(--shell-header-height) + var(--admin-banner-height)));
-  margin-left: 0;
+/* Admin mode banner — sits flush under the 3rem header */
+.em-admin-banner {
+  position: fixed;
+  top: var(--shell-header-height, 3rem);
+  left: 0;
+  right: 0;
+  z-index: 7999;
+  height: var(--admin-banner-height, 2rem);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--cds-spacing-05);
+  background: var(--cds-background-brand);
+  color: var(--cds-text-on-color);
+  @include type.type-style('label-01');
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.em-content-body {
+/* Sidebar navigation overrides */
+.cds--side-nav {
+  top: var(--shell-header-height, 3rem) !important;
+  height: calc(100% - var(--shell-header-height, 3rem)) !important;
+  background: var(--cds-layer-01);
+}
+
+/* Side panel */
+.em-side-panel {
+  position: fixed;
+  top: var(--shell-header-height);
+  right: 0;
+  width: 20rem; /* Carbon standard side panel width (~320px) */
+  height: calc(100% - var(--shell-header-height));
+  background: var(--cds-layer-01);
+  border-left: 1px solid var(--cds-border-subtle-01);
+  overflow-y: auto;
+  z-index: var(--em-z-side-panel);
+  display: flex;
+  flex-direction: column;
+  transition: width 240ms var(--cds-motion-easing-standard, ease);
+
+  &--expanded {
+    width: 40rem; /* Wide view for detailed trends/tables */
+    max-width: 90vw;
+  }
+
+  @media (max-width: 66rem) {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-left: none;
+    box-shadow: var(--cds-shadow-m, 0 4px 8px rgba(0,0,0,0.1));
+    z-index: var(--em-z-mobile-overlay);
+  }
+}
+
+.em-side-panel__header {
+  padding: var(--cds-spacing-05) var(--cds-spacing-06);
+  border-bottom: 1px solid var(--cds-border-subtle-01);
+}
+
+.em-side-panel__header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.em-side-panel__label {
+  margin-bottom: var(--cds-spacing-02);
+}
+
+.em-side-panel__body {
   flex: 1;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-}
-
-/* Floor plan container — absolutely fills the position:relative parent in Content body */
-.em-floorplan-container {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: var(--cds-background);
-}
-
-.em-floorplan-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
+  padding: var(--cds-spacing-05) var(--cds-spacing-06);
 }
 
 /* Status colours — Carbon support tokens so they respond to theme changes */
 .em-marker--pass    { fill: var(--cds-support-success); }
 .em-marker--fail    { fill: var(--cds-support-error); }
 .em-marker--warning { fill: var(--cds-support-warning); }
-.em-marker--pending { fill: var(--cds-support-warning); opacity: 0.7; }
+
+/* Pending uses a distinct pattern: half-filled or distinct color to differentiate from warning */
+.em-marker--pending {
+  fill: var(--cds-support-info);
+  fill-opacity: 0.6;
+  stroke-dasharray: 2 2;
+}
+
 .em-marker--no-data { fill: var(--cds-text-placeholder); }
 
 /* Blast Radius visualization */
@@ -106,15 +139,18 @@ body,
 /* Marker group interaction */
 .em-marker-group {
   cursor: pointer;
-  pointer-events: all;
+  outline: none;
+  transition: transform 110ms var(--cds-motion-easing-standard, ease);
 
-  &:focus {
-    outline: none;
+  &:hover {
+    transform: scale(1.15);
   }
 
-  &:focus-visible circle {
-    stroke: var(--cds-focus);
-    stroke-width: 2.5px;
+  &:focus-visible {
+    circle {
+      stroke: var(--cds-focus);
+      stroke-width: 3;
+    }
   }
 }
 
@@ -123,69 +159,67 @@ body,
   user-select: none;
 }
 
-/* Side panel */
-.em-side-panel {
-  position: fixed;
-  top: var(--shell-header-height);
-  right: 0;
-  width: 20rem; /* Carbon standard side panel width (~320px) */
-  height: calc(100% - var(--shell-header-height));
-  background: var(--cds-layer-01);
-  border-left: 1px solid var(--cds-border-subtle-01);
-  overflow-y: auto;
-  z-index: 200;
+/* ---------------------------------------------------------------------------
+   Floor Plan components
+   --------------------------------------------------------------------------- */
+
+.em-floorplan-container {
+  position: absolute;
+  inset: 0;
+  background: var(--cds-background);
   display: flex;
-  flex-direction: column;
-  transition: width 240ms var(--cds-motion-easing-standard, ease);
-
-  &--expanded {
-    width: 40rem; /* Wide view for detailed trends/tables */
-    max-width: 80vw;
-  }
-
-  @media (max-width: 66rem) {
-    width: 100% !important;
-    max-width: 100% !important;
-    border-left: none;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 10000; /* Over everything */
-  }
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.em-side-panel__header {
-  padding: var(--cds-spacing-05) var(--cds-spacing-06);
+/* Custom Tooltip */
+.em-tooltip {
+  position: fixed;
+  z-index: 10000;
+  background: var(--cds-background-inverse);
+  color: var(--cds-text-inverse);
+  padding: var(--cds-spacing-03) var(--cds-spacing-04);
+  pointer-events: none;
+  transform: translate(12px, 12px);
+  box-shadow: var(--cds-shadow-s);
+  min-width: 200px;
+}
+
+/* ---------------------------------------------------------------------------
+   Filters & Controls
+   --------------------------------------------------------------------------- */
+
+.em-filter-bar {
+  background: var(--cds-layer-01);
   border-bottom: 1px solid var(--cds-border-subtle-01);
-
-  &-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+  padding: 0 var(--cds-spacing-05);
+  height: var(--cds-spacing-09);
+  display: flex;
+  align-items: center;
+  z-index: 100;
 }
 
-.em-side-panel__label {
-  margin-bottom: var(--cds-spacing-02);
-  color: var(--cds-text-secondary);
-}
-
-.em-side-panel__body {
-  flex: 1;
-  overflow-y: auto;
-}
+/* ---------------------------------------------------------------------------
+   Tabs & Tables
+   --------------------------------------------------------------------------- */
 
 .em-tab-content {
-  padding: var(--cds-spacing-05);
+  padding-top: var(--cds-spacing-05);
+}
+
+.em-secondary-text {
+  color: var(--cds-text-secondary);
 }
 
 .em-flex-group {
   display: flex;
-  gap: var(--cds-spacing-03);
-  margin-bottom: var(--cds-spacing-05);
+  gap: var(--cds-spacing-05);
+  align-items: center;
 }
 
 .em-expanded-row-content {
-  padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  background: var(--cds-layer-02);
+  background: var(--cds-layer-01);
 }
 
 .em-clickable-row {
@@ -204,131 +238,69 @@ body,
 .em-chart-container {
   margin-top: var(--cds-spacing-05);
   display: flex;
-  justify-content: center;
-
-  svg {
-    overflow: visible;
-    display: block;
-  }
+  flex-direction: column;
 }
 
-.em-secondary-text {
-  color: var(--cds-text-secondary);
-}
+/* ---------------------------------------------------------------------------
+   Coordinate Mapper (Admin)
+   --------------------------------------------------------------------------- */
 
-/* Side nav count label */
-.em-side-nav-count {
-  margin-left: var(--cds-spacing-03);
-  font-size: var(--cds-label-01-font-size, 0.75rem);
-  font-weight: var(--cds-font-weight-regular, 400);
-  opacity: 0.7;
-}
-
-/* Hover tooltip — SVG marker hover (Carbon Tooltip cannot wrap SVG elements) */
-.em-tooltip {
-  position: fixed;
-  background: var(--cds-background-inverse);
-  color: var(--cds-text-inverse);
-  padding: var(--cds-spacing-03) var(--cds-spacing-04);
-  border-radius: 0.125rem;
-  font-size: var(--cds-label-01-font-size, 0.75rem);
-  font-weight: var(--cds-font-weight-regular, 400);
-  line-height: var(--cds-label-01-line-height, 1.33333);
-  pointer-events: none;
-  z-index: 1000;
-  white-space: nowrap;
-}
-
-/* Filter bar */
-.em-filter-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--cds-spacing-05);
-  padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  background: var(--cds-layer-01);
-  border-bottom: 1px solid var(--cds-border-subtle-01);
-}
-
-/* Admin mode banner — sits flush under the 3rem header */
-.em-admin-banner {
-  position: fixed;
-  top: var(--shell-header-height);
-  left: 0;
-  right: 0;
-  z-index: 7999;
-  height: var(--admin-banner-height);
-  display: flex;
-  align-items: center;
-  padding: 0 var(--cds-spacing-05);
-  background: var(--cds-background-brand);
-  color: var(--cds-text-on-color);
-  font-size: var(--cds-label-01-font-size, 0.75rem);
-  font-weight: var(--cds-font-weight-semibold, 600);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-/* Admin mapper — absolutely fills the position:relative parent in AppShell */
 .em-mapper-container {
-  position: absolute;
-  inset: 0;
   display: flex;
-}
-
-.em-mapper-sidebar {
-  width: min(22.5rem, 35vw); /* ~360px max, but fluid */
-  min-width: 16rem; /* ~256px min (SideNav width) */
-  flex-shrink: 0;
-  border-right: 1px solid var(--cds-border-subtle-01);
-  overflow-y: auto;
-  background: var(--cds-layer-01);
-}
-
-.em-mapper-canvas {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+  height: 100%;
   background: var(--cds-background);
 }
 
-/* Hierarchy filter dropdowns in the unmapped tab */
-.em-hierarchy-filters {
+.em-mapper-sidebar {
+  width: min(360px, 35vw);
+  border-right: 1px solid var(--cds-border-subtle-01);
+  background: var(--cds-layer-01);
   display: flex;
   flex-direction: column;
-  gap: var(--cds-spacing-03);
-  padding: var(--cds-spacing-03) var(--cds-spacing-05);
+  overflow-y: auto;
+
+  .cds--tabs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .cds--tab-content {
+    flex: 1;
+    padding: var(--cds-spacing-05);
+  }
+}
+
+.em-hierarchy-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--cds-spacing-04);
+  margin-bottom: var(--cds-spacing-06);
+}
+
+.em-mapper-search {
+  margin-bottom: var(--cds-spacing-05);
 }
 
 .em-hierarchy-count {
-  font-size: var(--cds-label-01-font-size, 0.75rem);
+  @include type.type-style('label-01');
   color: var(--cds-text-secondary);
-  padding: 0 var(--cds-spacing-05) var(--cds-spacing-02);
+  margin-bottom: var(--cds-spacing-04);
 }
 
-/* Location search box in the unmapped tab */
-.em-mapper-search {
-  padding: var(--cds-spacing-03) var(--cds-spacing-05);
-}
-
-.em-mapper-search .cds--search {
-  width: 100%;
-}
-
-/* Draggable location items */
 .em-draggable-id {
-  cursor: grab;
-  padding: var(--cds-spacing-02) var(--cds-spacing-03);
-  margin: 0 var(--cds-spacing-05) var(--cds-spacing-02);
-  background: var(--cds-layer-02);
-  border-left: 0.125rem solid var(--cds-border-subtle-01);
-  font-size: var(--cds-label-01-font-size, 0.75rem);
   display: flex;
   align-items: center;
-  transition: background var(--cds-duration-fast-01, 70ms) var(--cds-motion-easing-standard, ease);
+  padding: var(--cds-spacing-03) var(--cds-spacing-04);
+  background: var(--cds-layer-02);
+  border: 1px solid var(--cds-border-subtle-02);
+  margin-bottom: var(--cds-spacing-02);
+  cursor: grab;
+  @include type.type-style('code-01');
+  font-size: 0.75rem;
+  transition: background 110ms;
 
   &:hover {
     background: var(--cds-layer-hover-02);
-    border-left-color: var(--cds-interactive);
   }
 
   &:active {
@@ -339,48 +311,46 @@ body,
 .em-mapped-row {
   display: flex;
   align-items: center;
-  margin: 0 var(--cds-spacing-05) var(--cds-spacing-02);
+  gap: var(--cds-spacing-02);
+  margin-bottom: var(--cds-spacing-02);
 }
 
 .em-mapped-draggable {
-  background: var(--cds-highlight);
-  border-left-color: var(--cds-interactive);
-  flex: 1;
-  margin: 0;
-
-  &:hover {
-    background: var(--cds-layer-selected-hover-01);
-  }
+  border-left: 4px solid var(--cds-support-success);
 }
 
 .em-floor-badge {
-  font-size: var(--cds-label-01-font-size, 0.75rem);
-  font-weight: var(--cds-font-weight-semibold, 600);
-  background: var(--cds-interactive);
-  color: var(--cds-text-on-color);
-  border-radius: 0.125rem;
+  @include type.type-style('label-01');
+  background: var(--cds-layer-03);
   padding: 0 var(--cds-spacing-02);
-  margin-left: var(--cds-spacing-02);
-  flex-shrink: 0;
+  border-radius: 2px;
+  margin-left: auto;
 }
 
-/* Floor selector bar at the top of the mapper canvas */
+.em-mapper-canvas {
+  flex: 1;
+  position: relative;
+  background: var(--cds-background-selected);
+  overflow: hidden;
+}
+
 .em-mapper-floor-bar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 5;
+  height: var(--cds-spacing-09);
+  padding: 0 var(--cds-spacing-05);
   display: flex;
   align-items: center;
-  gap: var(--cds-spacing-05);
-  padding: var(--cds-spacing-03) var(--cds-spacing-04);
+  gap: var(--cds-spacing-04);
   background: var(--cds-layer-01);
   border-bottom: 1px solid var(--cds-border-subtle-01);
+  z-index: 50;
 }
 
 .em-mapper-floor-count {
-  font-size: var(--cds-label-01-font-size, 0.75rem);
+  @include type.type-style('label-01');
   color: var(--cds-text-secondary);
 }
 
@@ -411,7 +381,7 @@ body,
     }
 
     /* Slider container */
-    div[style*="max-width: 24rem"] {
+    .em-filter-bar__slider {
       max-width: 100% !important;
       flex: 1 1 100% !important;
       margin-left: 0 !important;
