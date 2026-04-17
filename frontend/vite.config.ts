@@ -12,9 +12,10 @@ export default defineConfig({
     svgr({ svgrOptions: { exportType: 'named', ref: true } }),
   ],
   resolve: {
-    alias: {
-      '~': path.resolve(__dirname, 'src'),
-    },
+    alias: [
+      { find: /^~\//, replacement: path.resolve(__dirname, 'src') + '/' },
+      { find: /^~(?!\/)/, replacement: path.resolve(__dirname, 'node_modules') + '/' },
+    ],
   },
   server: {
     proxy: {
