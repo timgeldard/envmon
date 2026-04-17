@@ -49,24 +49,33 @@ make deploy PROFILE=prod
 
 ## ✨ Key Features
 
-### 1. Interactive Heatmap
-Visualise environmental risks across different floors.
--   **Deterministic Mode**: Displays the absolute worst status (Pass/Fail/Pending) for each location in the selected window.
--   **Continuous Mode**: Calculates a "Risk Score" based on historical failure frequency and recency, rendered with a visual "glow" effect.
+### 1. Advanced Interactive Heatmap
+Visualise environmental risks across different floors with intelligent modeling.
+-   **Deterministic Mode**: Displays the absolute worst status (Pass/Fail/Pending) for each location.
+-   **Continuous Mode**: Calculates a "Risk Score" based on failure frequency and recency.
+-   **Early Warning (SPC)**: Automatically flags locations with a **WARNING (Orange)** state if the last 3 quantitative swabs show a strictly rising trend, enabling proactive remediation before a breach occurs.
+-   **Spatial Correlation ("Blast Radius")**: Failed markers render a visual "risk halo" to guide sanitation teams on vector swabbing in the immediate physical vicinity.
 
-### 2. Time-Travel Historical Scrubbing
-Use the **Scrub History** slider to step back in time. The entire heatmap and location statuses will recalculate to show exactly how the facility looked on any specific day in the past year.
+### 2. Historical Playback & Time-Travel
+Step back in time to understand contamination events.
+-   **Scrub History**: Use the timeline slider to view the facility status on any specific day in the past.
+-   **Animated Time-Lapse**: Hit the **Play** button next to the slider to watch an animated replay of environmental trends over the last 90+ days.
 
-### 3. Location Intelligence
-Click any marker to open the **Location Panel**:
--   **Trends**: Visualise MIC (Master Inspection Characteristic) results over time with interactive SVG charts.
--   **Inspection Lots**: A detailed list of recent inspections with expandable result tables.
--   **Responsive Design**: The panel can be expanded for deep-dive analysis.
+### 3. Precision Filtering & Decay Tuning
+Calibrate the risk model to specific pathogens.
+-   **MIC filtering**: Multi-select characteristic types (e.g., Listeria, Salmonella, ATP) to isolate specific risks.
+-   **Dynamic Decay**: The risk score automatically applies organism-specific half-lives (e.g., Listeria persists longer than generic ATP counts).
+-   **Sensitivity Slider**: Manually tune the global risk sensitivity in real-time.
 
-### 4. Admin Mode (Coordinate Mapping)
-A dedicated tool for facility administrators to map SAP Functional Locations to X/Y coordinates on the floor plans.
--   **Hierarchy Engine**: Backend-driven cascading filters (L1 → L5) to quickly find unmapped locations.
--   **Drag-and-Drop**: Simply drag a location from the sidebar onto the map to set its position.
+### 4. Location Intelligence & Reporting
+-   **Trends**: Visualise MIC results over time with interactive SVG charts.
+-   **Inspection Lots**: Detailed list of recent inspections with expandable result tables.
+-   **Export to CSV**: Download heatmap marker data directly from the UI for offline reporting and compliance audits.
+
+### 5. Admin Mode (Coordinate Mapping)
+A dedicated tool for mapping SAP Functional Locations to X/Y floor plan coordinates.
+-   **Hierarchy Engine**: Backend-driven cascading filters (L1 → L5) for efficient mapping.
+-   **Drag-and-Drop**: Set or reposition markers by dragging locations directly onto the map.
 
 ---
 
@@ -92,34 +101,26 @@ A dedicated tool for facility administrators to map SAP Functional Locations to 
 
 ---
 
-## 🗄 Database & Migrations
-The application stores its configuration (coordinates) in a dedicated table on Databricks SQL:
--   `em_location_coordinates`: Maps `func_loc_id` to `floor_id`, `x_pos`, and `y_pos`.
-
-Migrations are idempotent and applied automatically during `make deploy`. They can be run manually via:
-```bash
-make setup-coordinates PROFILE=uat
-```
-
----
-
 ## 🏗 Architecture Highlights
 
-### Heatmap Logic
-The heatmap supports two distinct visualisation strategies:
--   **Deterministic**: A binary-style view where any failure in the time window (clamped by the time-travel slider) results in a "Red" status.
--   **Continuous (Risk Score)**: A weighted calculation that considers both the frequency and recency of failures. A location that failed yesterday is "riskier" than one that failed 3 months ago.
+### SPC & Early Warning Logic
+The backend applies a lightweight Statistical Process Control (SPC) rule: if a location has 3 consecutive quantitative results where $v_3 > v_2 > v_1$, it is flagged as `WARNING`. If the value is also $> 50\%$ of the upper tolerance, the warning is intensified.
 
-### Backend Hierarchy Engine
-To support the admin mapping tool without overloading the frontend, the backend constructs a nested dictionary of unmapped locations. It uses a recursive `setdefault` pattern to group locations into a 5-segment hierarchy (L1-L4 for filtering, L5 as the selectable item).
+### Risk Decay Algorithm
+The risk score $S$ is calculated as:
+$$S = \sum F_i \cdot e^{-\lambda t_i}$$
+Where $F_i$ is the failure weight, $t_i$ is the days since the inspection, and $\lambda$ is the organism-specific decay constant. This ensures recent failures carry more weight than historical ones.
 
-### Time-Travel Sync
-The `FilterBar` uses a custom `computeDaysSinceToday` helper to synchronise the **Vite** frontend state with the **FastAPI** backend. When you move the slider, the `as_of_date` is sent to the backend, which adjusts its SQL `WHERE` clauses to "point-in-time" queries.
+### Multi-Plant Generalization
+The app is fully configurable via environment variables:
+-   `EM_PLANT_ID`: Scope data to a specific plant.
+-   `EM_FLOOR_CONFIG`: JSON string defining custom floors, SVG URLs, and dimensions.
+-   `EM_LOT_TABLE`, `EM_RESULT_TABLE`, etc.: Dynamic Unity Catalog table paths.
 
 ---
 
-## 🎨 Design Standards
-This project follows the **IBM Carbon Design System** with zero tolerance for hardcoded literals.
--   All spacing, colors, and typography use `var(--cds-*)` tokens.
--   Supports **Dark Mode** via the Carbon `g100` theme (toggle in the header).
--   Layout adheres to the **IBM UI Shell** architecture.
+## 🎨 Design & Accessibility
+-   **IBM Carbon Design System**: Zero tolerance for hardcoded literals; full tokenisation.
+-   **Dark Mode**: Supports a high-contrast `g100` theme for control room environments.
+-   **Responsive & Mobile-Ready**: Collapsible side panels and wrapping filter bars ensure usability on tablets and mobile devices.
+-   **Stability**: Global Error Boundaries prevent UI crashes and provide graceful recovery.
