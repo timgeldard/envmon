@@ -5,6 +5,7 @@
 @use '@carbon/styles/scss/theme' with (
   $theme: themes.$white
 );
+@use '@carbon/colors' as colors;
 @use '@carbon/styles';
 
 /* ---------------------------------------------------------------------------
@@ -79,16 +80,16 @@ body,
 .em-marker--pending { fill: var(--cds-support-warning); }
 .em-marker--no-data { fill: var(--cds-text-placeholder); }
 
-/* Floor-specific marker colors (Carbon v11 tokens) */
+/* Floor-specific marker colors (Carbon v11 palette) */
 :root {
-  --em-marker-f1: #0f62fe; /* blue-60 */
-  --em-marker-f2: #8a3ffc; /* magenta-60 */
-  --em-marker-f3: #007d79; /* teal-60 */
+  --em-marker-f1: #{colors.$blue-60};
+  --em-marker-f2: #{colors.$magenta-60};
+  --em-marker-f3: #{colors.$teal-60};
 }
 
 /* Glow effect for continuous mode */
 .em-marker--glow {
-  filter: drop-shadow(0 0 0.375rem currentColor);
+  filter: drop-shadow(0 0 0.375rem currentcolor);
 }
 
 /* Marker group interaction */
@@ -172,8 +173,13 @@ body,
   cursor: pointer;
 }
 
-.em-expanded-row-cell {
-  padding: 0 !important;
+/* 
+  Intentionally zero out padding on expanded row cells to allow the internal
+  Layer content to bleed to the edges. Scoped to .em-side-panel to avoid
+  affecting other data tables.
+*/
+.em-side-panel .cds--expandable-row td.em-expanded-row-cell {
+  padding: 0;
 }
 
 .em-chart-container {

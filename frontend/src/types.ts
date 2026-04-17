@@ -83,6 +83,12 @@ export interface LotDetailResponse {
   mic_results: MicResult[];
 }
 
+export interface LocationSummary {
+  meta: LocationMeta;
+  mics: string[];
+  recent_lots: InspectionLot[];
+}
+
 export interface CoordinateUpsertRequest {
   func_loc_id: string;
   floor_id: string;

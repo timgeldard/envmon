@@ -13,6 +13,7 @@ import type {
   TrendResponse,
   InspectionLot,
   LotDetailResponse,
+  LocationSummary,
   CoordinateUpsertRequest,
 } from '~/types';
 
@@ -136,7 +137,7 @@ export function useLotDetail(lotId: string | null) {
 }
 
 export function useLocationSummary(funcLocId: string | null) {
-  return useQuery<any>({
+  return useQuery<LocationSummary>({
     queryKey: ['location-summary', funcLocId],
     queryFn: () => apiFetch(`/api/em/locations/${encodeURIComponent(funcLocId!)}/summary`),
     enabled: Boolean(funcLocId),
