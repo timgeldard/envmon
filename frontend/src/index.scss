@@ -6,6 +6,7 @@
   $theme: themes.$white
 );
 @use '@carbon/colors' as colors;
+@use '@carbon/styles';
 
 /* ---------------------------------------------------------------------------
    Application layout
@@ -172,7 +173,12 @@ body,
   cursor: pointer;
 }
 
-.em-side-panel .em-expanded-row-cell {
+/* 
+  Intentionally zero out padding on expanded row cells to allow the internal
+  Layer content to bleed to the edges. Scoped to .em-side-panel to avoid
+  affecting other data tables.
+*/
+.em-side-panel .cds--expandable-row td.em-expanded-row-cell {
   padding: 0;
 }
 

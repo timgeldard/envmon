@@ -9,6 +9,7 @@ from the inspection point data (type-14 lots, P225) that have no corresponding
 row in em_location_coordinates.
 """
 
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException
@@ -146,7 +147,7 @@ async def get_hierarchy(
     for r in rows:
         flid = r["func_loc_id"]
         parts = flid.split("-")
-        if len(parts) < 4:
+        if len(parts) < 5:
             # Skip functional locations that don't follow the 5-level format (L1-L2-L3-L4-L5)
             continue
 
@@ -200,7 +201,6 @@ async def get_location_summary(
         )
 
     # 2. Fetch MICs (last 180 days to avoid unbounded scans)
-    from datetime import date, timedelta
     date_from = (date.today() - timedelta(days=180)).isoformat()
     mic_params = [
         sql_param("func_loc_id", func_loc_id),
@@ -235,6 +235,7 @@ async def get_location_summary(
         WHERE lot.PLANT_ID = :plant_id
           AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
           AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+          AND lot.CREATED_DATE >= :date_from
         GROUP BY 1, 2, 3, 4 ORDER BY 3 DESC LIMIT 5
     """
     lot_rows = await run_sql_async(token, lot_sql, mic_params)

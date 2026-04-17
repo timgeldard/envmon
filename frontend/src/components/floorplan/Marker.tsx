@@ -59,7 +59,7 @@ export default function Marker({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
-      aria-label={`Location ${marker.func_loc_id}: ${marker.status}${marker.risk_score != null ? `, Risk score: ${marker.risk_score.toFixed(2)}` : ''}`}
+      aria-label={`Location ${marker.func_loc_id}: ${marker.status}${marker.risk_score !== null ? `, Risk score: ${marker.risk_score.toFixed(2)}` : ''}`}
     >
       {/* Glow halo for continuous mode */}
       {mode === 'continuous' && glowOpacity > 0 && (

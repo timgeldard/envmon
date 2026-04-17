@@ -11,6 +11,15 @@ const TIME_WINDOWS: { value: TimeWindow; label: string }[] = [
   { value: 365, label: 'Last 365 days' },
 ];
 
+/** Compute days between a YYYY-MM-DD string and today (local time) */
+function computeDaysSinceToday(ymd: string): number {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const hDate = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - hDate.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export default function FilterBar() {
   const {
     timeWindow, setTimeWindow,
@@ -20,16 +29,8 @@ export default function FilterBar() {
 
   // Clamp or clear historicalDate when timeWindow shrinks
   useEffect(() => {
-    if (historicalDate) {
-      const parts = historicalDate.split('-').map(Number);
-      const hDate = new Date(parts[0], parts[1] - 1, parts[2]);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const diffDays = Math.floor((today.getTime() - hDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (diffDays > timeWindow) {
-        setHistoricalDate(null);
-      }
+    if (historicalDate && computeDaysSinceToday(historicalDate) > timeWindow) {
+      setHistoricalDate(null);
     }
   }, [timeWindow, historicalDate, setHistoricalDate]);
 
@@ -48,11 +49,9 @@ export default function FilterBar() {
 
   const getSliderValue = () => {
     if (!historicalDate) return 0;
-    const parts = historicalDate.split('-').map(Number);
-    const hDate = new Date(parts[0], parts[1] - 1, parts[2]);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Math.floor((today.getTime() - hDate.getTime()) / (1000 * 60 * 60 * 24));
+    const diff = computeDaysSinceToday(historicalDate);
+    // Clamp to [0, timeWindow] to handle transient states during resize
+    return Math.min(Math.max(diff, 0), timeWindow);
   };
 
   return (
