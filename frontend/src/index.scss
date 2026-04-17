@@ -77,8 +77,19 @@ body,
 /* Status colours — Carbon support tokens so they respond to theme changes */
 .em-marker--pass    { fill: var(--cds-support-success); }
 .em-marker--fail    { fill: var(--cds-support-error); }
-.em-marker--pending { fill: var(--cds-support-warning); }
+.em-marker--warning { fill: var(--cds-support-warning); }
+.em-marker--pending { fill: var(--cds-support-warning); opacity: 0.7; }
 .em-marker--no-data { fill: var(--cds-text-placeholder); }
+
+/* Blast Radius visualization */
+.em-blast-radius {
+  fill: var(--cds-support-error);
+  fill-opacity: 0.08;
+  stroke: var(--cds-support-error);
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  pointer-events: none;
+}
 
 /* Floor-specific marker colors (Carbon v11 palette) */
 :root {

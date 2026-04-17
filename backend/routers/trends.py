@@ -31,17 +31,18 @@ router = APIRouter()
 
 @router.get("/mics", response_model=list[str])
 async def list_mics(
-    func_loc_id: str,
+    func_loc_id: Optional[str] = Query(None),
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
-    """Return distinct normalised MIC names available for a functional location."""
+    """Return distinct normalised MIC names available for a functional location or all locations."""
     token = resolve_token(x_forwarded_access_token, authorization)
 
-    params = [
-        sql_param("func_loc_id", func_loc_id),
-        sql_param("plant_id", PLANT_ID),
-    ]
+    params = [sql_param("plant_id", PLANT_ID)]
+    where_clause = ""
+    if func_loc_id:
+        params.append(sql_param("func_loc_id", func_loc_id))
+        where_clause = "AND ip.FUNCTIONAL_LOCATION = :func_loc_id"
 
     sql = f"""
         SELECT DISTINCT UPPER(TRIM(r.MIC_NAME)) AS mic_name
@@ -54,7 +55,7 @@ async def list_mics(
            AND ip.SAMPLE_ID         = r.SAMPLE_ID
         WHERE lot.PLANT_ID           = :plant_id
           AND lot.INSPECTION_TYPE IN {INSP_TYPES_SQL}
-          AND ip.FUNCTIONAL_LOCATION = :func_loc_id
+          {where_clause}
           AND r.MIC_NAME IS NOT NULL
         ORDER BY mic_name
     """

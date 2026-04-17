@@ -1,24 +1,15 @@
 """
-GET /api/em/heatmap — heatmap data for a floor in deterministic or continuous mode.
+GET /api/em/heatmap — heatmap data for a floor with advanced analytics.
 
-Data source: three-table join
-  gold_inspection_lot → gold_inspection_point → gold_batch_quality_result_v
-filtered to PLANT_ID = P225 and INSPECTION_TYPE IN ('14', 'Z14').
-
-Deterministic (worst-case per location in window):
-  FAIL    → at least one lot has INSPECTION_RESULT_VALUATION = 'R'
-  PENDING → lot exists but INSPECTION_END_DATE IS NULL
-  PASS    → all lots have INSPECTION_RESULT_VALUATION = 'A'
-  NO_DATA → no lots in window
-
-Continuous (weighted intensity):
-  S = sum(F_i * exp(-lambda * t_i))
-  F_i: 1.0 for fail ('R'), 0.2 for warning ('W')
-  t_i: days since lot CREATED_DATE
-  lambda: 0.1 (≈ 14-day effective half-life at ln2/lambda ≈ 6.9 days)
+Features:
+- Deterministic/Continuous modes
+- Time-travel historical view (as_of_date)
+- MIC-specific filtering and dynamic decay tuning
+- Early Warning via Statistical Process Control (SPC)
 """
 
 import math
+import os
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Literal, Optional
@@ -31,6 +22,7 @@ from backend.utils.em_config import (
     COORD_TBL,
     INSP_TYPES_SQL,
     LOT_TBL,
+    MIC_DECAY_RATES,
     PLANT_ID,
     POINT_TBL,
     RESULT_TBL,
@@ -38,13 +30,19 @@ from backend.utils.em_config import (
 
 router = APIRouter()
 
-_LAMBDA = 0.1
+# Default decay constant yielding a ~7 day half-life (ln2/0.1 ≈ 6.93)
+_DEFAULT_LAMBDA = float(os.environ.get("EM_DEFAULT_DECAY_LAMBDA", "0.1"))
 
 
-def _risk_score(lot_rows: list[dict], today: date) -> float:
+def _risk_score(rows: list[dict], today: date, decay_lambda: float) -> float:
+    """
+    Calculate weighted intensity risk score.
+    Now supports MIC-specific decay if available.
+    """
     score = 0.0
-    for r in lot_rows:
-        val = (r.get("lot_valuation") or "").upper()
+    for r in rows:
+        val = (r.get("valuation") or "").upper()
+        mic_name = (r.get("mic_name") or "").upper().strip()
         created_str = r.get("lot_date")
         if not created_str:
             continue
@@ -52,6 +50,7 @@ def _risk_score(lot_rows: list[dict], today: date) -> float:
             created = date.fromisoformat(str(created_str)[:10])
         except ValueError:
             continue
+
         t_i = (today - created).days
         if val == "R":
             f_i = 1.0
@@ -59,8 +58,42 @@ def _risk_score(lot_rows: list[dict], today: date) -> float:
             f_i = 0.2
         else:
             continue
-        score += f_i * math.exp(-_LAMBDA * t_i)
+
+        # Use MIC-specific lambda if defined, else fallback to global
+        lam = MIC_DECAY_RATES.get(mic_name, decay_lambda)
+        score += f_i * math.exp(-lam * t_i)
     return score
+
+
+def _check_spc_warning(rows: list[dict]) -> bool:
+    """
+    Apply lightweight SPC rules for Early Warning.
+    Nelson Rule 1 variant: 3 consecutive rising quantitative swabs.
+    """
+    # Sort by date
+    sorted_rows = sorted(
+        [r for r in rows if r.get("result_value") is not None],
+        key=lambda x: x["lot_date"]
+    )
+    if len(sorted_rows) < 3:
+        return False
+
+    last_3 = sorted_rows[-3:]
+    v1, v2, v3 = last_3[0]["result_value"], last_3[1]["result_value"], last_3[2]["result_value"]
+
+    # Strictly increasing?
+    if v3 > v2 > v1:
+        # approaching upper limit? (if limit exists)
+        limit = last_3[2].get("upper_limit")
+        if limit is not None and limit > 0:
+            if v3 >= (limit * 0.5): # flag if > 50% of limit
+                return True
+        else:
+            # no limit, just flag the trend if it's substantial (> 10% rise)
+            if (v3 / v1) > 1.1:
+                return True
+
+    return False
 
 
 @router.get("/heatmap", response_model=HeatmapResponse)
@@ -68,7 +101,9 @@ async def get_heatmap(
     floor_id: str,
     mode: Literal["deterministic", "continuous"] = Query("deterministic"),
     time_window_days: int = Query(90, ge=1, le=365),
-    as_of_date: Optional[date] = Query(None, description="ISO date to view heatmap as of"),
+    decay_lambda: Optional[float] = Query(None, ge=0.0, le=1.0),
+    mics: Optional[list[str]] = Query(None),
+    as_of_date: Optional[date] = Query(None),
     x_forwarded_access_token: Optional[str] = Header(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
@@ -78,6 +113,8 @@ async def get_heatmap(
     date_from = (reference_date - timedelta(days=time_window_days)).isoformat()
     date_to = reference_date.isoformat()
 
+    applied_lambda = decay_lambda if decay_lambda is not None else _DEFAULT_LAMBDA
+
     params = [
         sql_param("floor_id", floor_id),
         sql_param("plant_id", PLANT_ID),
@@ -85,8 +122,16 @@ async def get_heatmap(
         sql_param("date_to", date_to),
     ]
 
-    # One row per (functional_location, lot) — worst valuation per lot aggregated in SQL.
-    # Python then computes the deterministic status and continuous risk score per location.
+    mic_filter = ""
+    if mics:
+        # Normalise input MICs for SQL
+        norm_mics = [m.upper().strip() for m in mics]
+        for idx, m in enumerate(norm_mics):
+            pname = f"mic_{idx}"
+            params.append(sql_param(pname, m))
+        placeholders = ", ".join(f":mic_{idx}" for idx in range(len(norm_mics)))
+        mic_filter = f"AND UPPER(TRIM(r.MIC_NAME)) IN ({placeholders})"
+
     sql = f"""
         SELECT
             c.func_loc_id,
@@ -96,22 +141,10 @@ async def get_heatmap(
             lot.INSPECTION_LOT_ID       AS lot_id,
             lot.CREATED_DATE            AS lot_date,
             lot.INSPECTION_END_DATE     AS lot_end_date,
-            MAX(
-                CASE r.INSPECTION_RESULT_VALUATION
-                    WHEN 'R' THEN 2
-                    WHEN 'W' THEN 1
-                    WHEN 'A' THEN 0
-                    ELSE -1
-                END
-            )                           AS worst_val_rank,
-            MAX(
-                CASE r.INSPECTION_RESULT_VALUATION
-                    WHEN 'R' THEN 'R'
-                    WHEN 'W' THEN 'W'
-                    WHEN 'A' THEN 'A'
-                    ELSE NULL
-                END
-            )                           AS lot_valuation
+            UPPER(TRIM(r.MIC_NAME))     AS mic_name,
+            r.QUANTITATIVE_RESULT       AS result_value,
+            r.UPPER_TOLERANCE           AS upper_limit,
+            r.INSPECTION_RESULT_VALUATION AS valuation
         FROM {COORD_TBL} c
         JOIN {POINT_TBL} ip
             ON c.func_loc_id = ip.FUNCTIONAL_LOCATION
@@ -126,60 +159,55 @@ async def get_heatmap(
            AND ip.OPERATION_ID      = r.OPERATION_ID
            AND ip.SAMPLE_ID         = r.SAMPLE_ID
         WHERE c.floor_id = :floor_id
-        GROUP BY
-            c.func_loc_id, c.floor_id, c.x_pos, c.y_pos,
-            lot.INSPECTION_LOT_ID, lot.CREATED_DATE, lot.INSPECTION_END_DATE
+          {mic_filter}
     """
     rows = await run_sql_async(token, sql, params)
 
-    # Also fetch coordinates for locations with NO lots (NO_DATA markers)
-    coord_sql = f"""
-        SELECT func_loc_id, floor_id, x_pos, y_pos
-        FROM {COORD_TBL}
-        WHERE floor_id = :floor_id
-    """
+    # Coordinates for NO_DATA placeholders
+    coord_sql = f"SELECT func_loc_id, floor_id, x_pos, y_pos FROM {COORD_TBL} WHERE floor_id = :floor_id"
     coord_rows = await run_sql_async(token, coord_sql, [sql_param("floor_id", floor_id)])
+    coord_map = {r["func_loc_id"]: r for r in coord_rows}
 
-    # Build a coordinate map
-    coord_map: dict[str, dict] = {r["func_loc_id"]: r for r in coord_rows}
-
-    # Group lot-level rows by func_loc_id
-    loc_lots: dict[str, list[dict]] = defaultdict(list)
+    # Group results by func_loc_id
+    loc_results = defaultdict(list)
     for r in rows:
-        loc_lots[r["func_loc_id"]].append(r)
+        loc_results[r["func_loc_id"]].append(r)
 
     markers: list[MarkerData] = []
 
     for func_loc_id, meta in coord_map.items():
-        lots = loc_lots.get(func_loc_id, [])
-        total_lots = len(lots)
-        fail_count = sum(1 for r in lots if r.get("lot_valuation") == "R")
-        pass_count = sum(1 for r in lots if r.get("lot_valuation") == "A")
-        pending_count = sum(1 for r in lots if r.get("lot_end_date") is None)
+        results = loc_results.get(func_loc_id, [])
+        total_lots = len(set(r["lot_id"] for r in results if r.get("lot_id")))
+        fail_count = sum(1 for r in results if r.get("valuation") == "R")
+        pass_count = sum(1 for r in results if r.get("valuation") == "A")
+        pending_count = sum(1 for r in results if r.get("lot_id") and r.get("lot_end_date") is None)
 
         if mode == "deterministic":
             if total_lots == 0:
                 status = "NO_DATA"
             elif fail_count > 0:
                 status = "FAIL"
+            elif _check_spc_warning(results):
+                status = "WARNING"
             elif pending_count > 0:
                 status = "PENDING"
             else:
                 status = "PASS"
             risk_score = None
         else:
-            risk_score = _risk_score(lots, reference_date)
+            risk_score = _risk_score(results, reference_date, applied_lambda)
             if total_lots == 0:
                 status = "NO_DATA"
             elif fail_count > 0:
                 status = "FAIL"
+            elif _check_spc_warning(results):
+                status = "WARNING"
             else:
                 status = "PASS"
 
         markers.append(
             MarkerData(
                 func_loc_id=func_loc_id,
-                func_loc_name=None,
                 floor_id=meta["floor_id"],
                 x_pos=float(meta["x_pos"]),
                 y_pos=float(meta["y_pos"]),
@@ -196,5 +224,6 @@ async def get_heatmap(
         floor_id=floor_id,
         mode=mode,
         time_window_days=time_window_days,
+        decay_lambda=applied_lambda,
         markers=markers,
     )

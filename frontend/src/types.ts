@@ -2,7 +2,7 @@
 // Shared domain types — mirror backend Pydantic schemas
 // ---------------------------------------------------------------------------
 
-export type HeatmapStatus = 'PASS' | 'FAIL' | 'PENDING' | 'NO_DATA';
+export type HeatmapStatus = 'PASS' | 'FAIL' | 'PENDING' | 'NO_DATA' | 'WARNING';
 export type HeatmapMode = 'deterministic' | 'continuous';
 export type TimeWindow = 30 | 60 | 90 | 180 | 365;
 

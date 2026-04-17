@@ -21,7 +21,7 @@ class LocationCoordinate(BaseModel):
 # Heatmap
 # ---------------------------------------------------------------------------
 
-HeatmapStatus = Literal["PASS", "FAIL", "PENDING", "NO_DATA"]
+HeatmapStatus = Literal["PASS", "FAIL", "PENDING", "NO_DATA", "WARNING"]
 
 
 class MarkerData(BaseModel):
@@ -44,6 +44,7 @@ class HeatmapResponse(BaseModel):
     floor_id: str
     mode: Literal["deterministic", "continuous"]
     time_window_days: int
+    decay_lambda: float
     markers: list[MarkerData]
 
 

@@ -30,5 +30,19 @@ POINT_TBL  = _quote(POINT_TBL_NAME)
 RESULT_TBL = _quote(RESULT_TBL_NAME)
 COORD_TBL  = _quote(COORD_TBL_NAME)
 
-# SQL IN clause for inspection types — e.g. "('14', 'Z14')"
+# SQL IN clause for inspection types — e.g. \"('14', 'Z14')\"
 INSP_TYPES_SQL = "(" + ", ".join(f"'{t}'" for t in INSPECTION_TYPES) + ")"
+
+# MIC-specific decay lambdas (lower lambda = longer half-life)
+# Override via EM_MIC_DECAY_<NORMALIZED_NAME> environment variables.
+def _get_mic_decay(name: str, default: float = 0.1) -> float:
+    env_key = f"EM_MIC_DECAY_{name.upper().replace(' ', '_')}"
+    return float(os.environ.get(env_key, str(default)))
+
+# Common defaults for critical organisms
+MIC_DECAY_RATES = {
+    "LISTERIA": 0.05,  # ~14 day half-life
+    "SALMONELLA": 0.05,
+    "ATP": 0.3,       # ~2.3 day half-life (clears quickly)
+    "APC": 0.2,       # ~3.5 day half-life
+}

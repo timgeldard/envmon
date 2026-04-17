@@ -64,6 +64,7 @@ export function useHeatmap(
   timeWindowDays: number,
   asOfDate?: string | null,
   decayLambda?: number,
+  mics?: string[],
 ) {
   const params = new URLSearchParams({
     floor_id: floorId,
@@ -72,9 +73,12 @@ export function useHeatmap(
   });
   if (asOfDate) params.set('as_of_date', asOfDate);
   if (decayLambda !== undefined) params.set('decay_lambda', String(decayLambda));
+  if (mics?.length) {
+    mics.forEach((m) => params.append('mics', m));
+  }
 
   return useQuery<HeatmapResponse>({
-    queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate, decayLambda],
+    queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate, decayLambda, mics],
     queryFn: () => apiFetch(`/api/em/heatmap?${params}`),
     staleTime: 5 * 60_000,
     enabled: Boolean(floorId),
@@ -85,11 +89,13 @@ export function useHeatmap(
 // Trends
 // ---------------------------------------------------------------------------
 
-export function useMics(funcLocId: string | null) {
+export function useMics(funcLocId: string | null = null) {
+  const params = new URLSearchParams();
+  if (funcLocId) params.set('func_loc_id', funcLocId);
+
   return useQuery<string[]>({
     queryKey: ['mics', funcLocId],
-    queryFn: () => apiFetch(`/api/em/mics?func_loc_id=${encodeURIComponent(funcLocId!)}`),
-    enabled: Boolean(funcLocId),
+    queryFn: () => apiFetch(`/api/em/mics?${params}`),
     staleTime: 10 * 60_000,
   });
 }

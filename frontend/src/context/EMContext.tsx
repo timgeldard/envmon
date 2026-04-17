@@ -22,6 +22,7 @@ interface EMState {
   theme: 'white' | 'g100';
   historicalDate: string | null;
   decayLambda: number;
+  selectedMics: string[];
 }
 
 interface EMActions {
@@ -34,6 +35,7 @@ interface EMActions {
   setTheme: (theme: 'white' | 'g100') => void;
   setHistoricalDate: (date: string | null) => void;
   setDecayLambda: (val: number) => void;
+  setSelectedMics: (mics: string[]) => void;
 }
 
 const EMContext = createContext<(EMState & EMActions) | null>(null);
@@ -66,10 +68,17 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
   const [decayLambda, setDecayLambdaRaw] = useState<number>(
     () => Number(new URLSearchParams(window.location.search).get('lambda')) || 0.1,
   );
+  const [selectedMics, setSelectedMicsRaw] = useState<string[]>(
+    () => new URLSearchParams(window.location.search).get('mics')?.split(',').filter(Boolean) || [],
+  );
 
   const pushParam = useCallback((key: string, value: string) => {
     const sp = new URLSearchParams(window.location.search);
-    sp.set(key, value);
+    if (value) {
+      sp.set(key, value);
+    } else {
+      sp.delete(key);
+    }
     window.history.replaceState(null, '', `?${sp}`);
   }, []);
 
@@ -118,6 +127,14 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
     [pushParam],
   );
 
+  const setSelectedMics = useCallback(
+    (mics: string[]) => {
+      setSelectedMicsRaw(mics);
+      pushParam('mics', mics.join(','));
+    },
+    [pushParam],
+  );
+
   const value = useMemo(
     () => ({
       activeFloor,
@@ -129,6 +146,7 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
       theme,
       historicalDate,
       decayLambda,
+      selectedMics,
       setActiveFloor,
       setTimeWindow,
       setHeatmapMode,
@@ -138,10 +156,11 @@ export function EMProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       setHistoricalDate,
       setDecayLambda,
+      setSelectedMics,
     }),
     [
-      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode, sidePanelExpanded, theme, historicalDate, decayLambda,
-      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId, setSidePanelExpanded, setTheme, setHistoricalDate, setDecayLambda,
+      activeFloor, timeWindow, heatmapMode, selectedLocId, adminMode, sidePanelExpanded, theme, historicalDate, decayLambda, selectedMics,
+      setActiveFloor, setTimeWindow, setHeatmapMode, setSelectedLocId, setSidePanelExpanded, setTheme, setHistoricalDate, setDecayLambda, setSelectedMics,
     ],
   );
 
