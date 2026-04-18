@@ -60,7 +60,11 @@ export default function FilterBar() {
     setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 100);
   };
   const [isPlaying, setIsPlaying] = useState(false);
-  const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Mirror filter state in a ref so the playback interval always reads the
+  // latest values without being recreated on every change.
+  const stateRef = useRef({ timeWindow, historicalDate });
+  stateRef.current = { timeWindow, historicalDate };
 
   // Clamp or clear historicalDate when timeWindow shrinks
   useEffect(() => {
@@ -69,32 +73,35 @@ export default function FilterBar() {
     }
   }, [timeWindow, historicalDate, setHistoricalDate]);
 
-  // Historical Playback Animation
+  // Historical Playback Animation — interval depends only on isPlaying.
   useEffect(() => {
-    if (isPlaying) {
-      // Start from current position or max if at 0
-      let currentDays = historicalDate ? computeDaysSinceToday(historicalDate) : timeWindow;
-      if (currentDays <= 0) currentDays = timeWindow;
+    if (!isPlaying) return;
 
-      playbackRef.current = setInterval(() => {
-        currentDays -= 1;
-        if (currentDays < 0) {
-          setIsPlaying(false);
-          setHistoricalDate(null);
-        } else {
-          const d = new Date();
-          d.setDate(d.getDate() - currentDays);
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          setHistoricalDate(`${year}-${month}-${day}`);
-        }
-      }, 600); // Speed of animation
-    } else {
-      if (playbackRef.current) clearInterval(playbackRef.current);
-    }
-    return () => { if (playbackRef.current) clearInterval(playbackRef.current); };
-  }, [isPlaying, timeWindow, setHistoricalDate, historicalDate]);
+    const { timeWindow: initialWindow, historicalDate: initialHd } = stateRef.current;
+    let currentDays = initialHd
+      ? Math.min(computeDaysSinceToday(initialHd), initialWindow)
+      : initialWindow;
+    if (currentDays <= 0) currentDays = initialWindow;
+
+    const id = setInterval(() => {
+      const currentWindow = stateRef.current.timeWindow;
+      currentDays -= 1;
+      if (currentDays > currentWindow) currentDays = currentWindow;
+      if (currentDays < 0) {
+        setIsPlaying(false);
+        setHistoricalDate(null);
+        return;
+      }
+      const d = new Date();
+      d.setDate(d.getDate() - currentDays);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      setHistoricalDate(`${year}-${month}-${day}`);
+    }, 600);
+
+    return () => clearInterval(id);
+  }, [isPlaying, setHistoricalDate]);
 
   const handleSliderChange = ({ value }: { value: number }) => {
     if (isPlaying) setIsPlaying(false);
