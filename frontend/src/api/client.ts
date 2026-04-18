@@ -5,6 +5,14 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// staleTime tiers — queries differ in how fresh the data needs to be.
+const STALE = {
+  realtime: 30_000,       // heatmap: data driving the primary visual
+  dynamic:  2 * 60_000,   // trends, lots, location summary: change with new inspections
+  stable:   10 * 60_000,  // floors, locations, MIC list: rarely change within a session
+  admin:    30_000,       // admin coord listings: must reflect recent mutations
+} as const;
 import type {
   FloorInfo,
   LocationMeta,
@@ -38,7 +46,7 @@ export function useFloors() {
   return useQuery<FloorInfo[]>({
     queryKey: ['floors'],
     queryFn: () => apiFetch('/api/em/floors'),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.stable,
   });
 }
 
@@ -50,7 +58,7 @@ export function useLocations(floorId?: string, mappedOnly = false) {
   return useQuery<LocationMeta[]>({
     queryKey: ['locations', floorId, mappedOnly],
     queryFn: () => apiFetch(`/api/em/locations?${params}`),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.stable,
   });
 }
 
@@ -80,7 +88,7 @@ export function useHeatmap(
   return useQuery<HeatmapResponse>({
     queryKey: ['heatmap', floorId, mode, timeWindowDays, asOfDate, decayLambda, mics],
     queryFn: () => apiFetch(`/api/em/heatmap?${params}`),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.realtime,
     enabled: Boolean(floorId),
   });
 }
@@ -96,7 +104,7 @@ export function useMics(funcLocId: string | null = null) {
   return useQuery<string[]>({
     queryKey: ['mics', funcLocId],
     queryFn: () => apiFetch(`/api/em/mics?${params}`),
-    staleTime: 10 * 60_000,
+    staleTime: STALE.stable,
   });
 }
 
@@ -114,7 +122,7 @@ export function useTrends(
     queryKey: ['trends', funcLocId, micName, windowDays],
     queryFn: () => apiFetch(`/api/em/trends?${params}`),
     enabled: Boolean(funcLocId && micName),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.dynamic,
   });
 }
 
@@ -131,7 +139,7 @@ export function useLots(funcLocId: string | null, timeWindowDays: number) {
     queryKey: ['lots', funcLocId, timeWindowDays],
     queryFn: () => apiFetch(`/api/em/lots?${params}`),
     enabled: Boolean(funcLocId),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.dynamic,
   });
 }
 
@@ -140,7 +148,7 @@ export function useLotDetail(lotId: string | null) {
     queryKey: ['lot-detail', lotId],
     queryFn: () => apiFetch(`/api/em/lots/${lotId}`),
     enabled: Boolean(lotId),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.stable,
   });
 }
 
@@ -149,7 +157,7 @@ export function useLocationSummary(funcLocId: string | null) {
     queryKey: ['location-summary', funcLocId],
     queryFn: () => apiFetch(`/api/em/locations/${encodeURIComponent(funcLocId!)}/summary`),
     enabled: Boolean(funcLocId),
-    staleTime: 5 * 60_000,
+    staleTime: STALE.dynamic,
   });
 }
 
@@ -161,7 +169,7 @@ export function useUnmappedLocations() {
   return useQuery<LocationMeta[]>({
     queryKey: ['coordinates', 'unmapped'],
     queryFn: () => apiFetch('/api/em/coordinates/unmapped'),
-    staleTime: 60_000,
+    staleTime: STALE.admin,
   });
 }
 
@@ -169,7 +177,7 @@ export function useMappedLocations() {
   return useQuery<LocationMeta[]>({
     queryKey: ['coordinates', 'mapped'],
     queryFn: () => apiFetch('/api/em/coordinates/mapped'),
-    staleTime: 60_000,
+    staleTime: STALE.admin,
   });
 }
 
